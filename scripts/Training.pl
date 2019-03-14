@@ -224,7 +224,7 @@ $mspfdir     = "$prjdir/mspf/ver${ver}";
 $mspffaldir  = "$mspfdir/fal";
 $scp{'mspf'} = "$mspfdir/fal.scp";
 foreach $type ('mgc') {
-   foreach $mspftype ( "nat", "gen/1mix/$pgtype" ) {
+   foreach $mspftype ( "nat", "gen/1mix/$pgtype", "gen/dnn/$pgtype", "gen/trj/$pgtype" ) {
       $mspfdatdir{$mspftype}   = "$mspfdir/dat/$mspftype";
       $mspfstatsdir{$mspftype} = "$mspfdir/stats/$mspftype";
       for ( $d = 0 ; $d < $ordr{$type} ; $d++ ) {
@@ -235,18 +235,17 @@ foreach $type ('mgc') {
 }
 
 # files and directories for neural networks
-$dnndir           = "$prjdir/dnn/ver${ver}";
-$dnnffidir{'ful'} = "$dnndir/ffi/full";
-$dnnffidir{'gen'} = "$dnndir/ffi/gen";
-$dnnmodels        = "$dnndir/models";
-$scp{'fio'}       = "$dnndir/train.ffi-ffo.scp";
-$scp{'ffi'}       = "$dnndir/gen.ffi.scp";
-$cfg{'tdn'}       = "$prjdir/configs/ver${ver}/trn_dnn.cnf";
-$cfg{'sdn'}       = "$prjdir/configs/ver${ver}/syn_dnn.cnf";
-foreach $type ( @cmp, 'ffo' ) {
-   $var{$type} = "$datdir/stats/$type.var";
-}
-$qconf = "$datdir/configs/$qname.conf";
+$dnndir              = "$prjdir/dnn/ver${ver}";
+$dnnffidir{'ful'}    = "$dnndir/ffi/full";
+$dnnffidir{'gen'}    = "$dnndir/ffi/gen";
+$dnnmodels           = "$dnndir/models";
+$dnnmodelsdir{'trj'} = "$dnnmodels/trj";
+$scp{'tdn'}          = "$dnndir/train.ffi-ffo.scp";
+$scp{'sdn'}          = "$dnndir/gen.ffi.scp";
+$cfg{'tdn'}          = "$prjdir/configs/ver${ver}/trn_dnn.cnf";
+$cfg{'trj'}          = "$prjdir/configs/ver${ver}/trj_dnn.cnf";
+$cfg{'sdn'}          = "$prjdir/configs/ver${ver}/syn_dnn.cnf";
+$qconf               = "$datdir/configs/$qname.conf";
 
 # HTS Commands & Options ========================
 $HCompV{'cmp'} = "$HCOMPV    -A    -C $cfg{'trn'} -D -T 1 -S $scp{'trn'} -m ";
@@ -285,6 +284,7 @@ if ($MKENV) {
 
    # make config files
    make_config();
+   make_config_dnn();
 
    # make model prototype definition file
    make_proto();
@@ -292,7 +292,7 @@ if ($MKENV) {
 
 # HCompV (computing variance floors)
 if ($HCMPV) {
-   print_time("computing variance floors 001/034");
+   print_time("computing variance floors 001/039");
 
    # make average model and compute variance floors
    $commandline = "$HCompV{'cmp'} -M $model{'cmp'} -o $avermmf{'cmp'} $prtfile{'cmp'} > $logdir/001_HCompV.log";
@@ -306,7 +306,7 @@ if ($HCMPV) {
 
 # HInit & HRest (initialization & reestimation)
 if ($IN_RE) {
-   print_time("initialization & reestimation 002/034");
+   print_time("initialization & reestimation 002/039");
 
    if ($daem) {
       open( LIST, $lst{'mon'} ) || die "Cannot open $!";
@@ -397,7 +397,7 @@ if ($IN_RE) {
 
 # HHEd (making a monophone mmf)
 if ($MMMMF) {
-   print_time("making a monophone mmf 003/034");
+   print_time("making a monophone mmf 003/039");
 
    foreach $set (@SET) {
       open( EDFILE, ">$lvf{$set}" ) || die "Cannot open $!";
@@ -426,7 +426,7 @@ if ($MMMMF) {
 
 # HERest (embedded reestimation (monophone))
 if ($ERST0) {
-   print_time("embedded reestimation (monophone) 004/034");
+   print_time("embedded reestimation (monophone) 004/039");
 
    if ($daem) {
       for ( $i = 1 ; $i <= $daem_nIte ; $i++ ) {
@@ -458,7 +458,7 @@ if ($ERST0) {
 
 # HHEd (copying monophone mmf to fullcontext one)
 if ($MN2FL) {
-   print_time("copying monophone mmf to fullcontext one 005/034");
+   print_time("copying monophone mmf to fullcontext one 005/039");
 
    foreach $set (@SET) {
       open( EDFILE, ">$m2f{$set}" ) || die "Cannot open $!";
@@ -492,7 +492,7 @@ if ($MN2FL) {
 
 # HERest (embedded reestimation (fullcontext))
 if ($ERST1) {
-   print_time("embedded reestimation (fullcontext) 006/034");
+   print_time("embedded reestimation (fullcontext) 006/039");
 
    $opt = "-C $cfg{'nvf'} -s $stats{'cmp'} -w 0.0";
 
@@ -510,7 +510,7 @@ if ($ERST1) {
 
 # HHEd (tree-based context clustering)
 if ($CXCL1) {
-   print_time("tree-based context clustering 1st 007/034");
+   print_time("tree-based context clustering 1st 007/039");
 
    # convert cmp stats to duration ones
    convstats();
@@ -535,7 +535,7 @@ if ($CXCL1) {
 
 # HERest (embedded reestimation (clustered))
 if ($ERST2) {
-   print_time("embedded reestimation (clustered) 008/034");
+   print_time("embedded reestimation (clustered) 008/039");
 
    for ( $i = 1 ; $i <= $nIte ; $i++ ) {
       print("\nIteration $i of Embedded Re-estimation\n");
@@ -551,7 +551,7 @@ if ($ERST2) {
 
 # HHEd (untying the parameter sharing structure)
 if ($UNTIE) {
-   print_time("untying the parameter sharing structure 009/034");
+   print_time("untying the parameter sharing structure 009/039");
 
    foreach $set (@SET) {
       make_edfile_untie($set);
@@ -572,7 +572,7 @@ foreach $set (@SET) {
 
 # HERest (embedded reestimation (untied))
 if ($ERST3) {
-   print_time("embedded reestimation (untied) 010/034");
+   print_time("embedded reestimation (untied) 010/039");
 
    $opt = "-C $cfg{'nvf'} -s $stats{'cmp'} -w 0.0";
 
@@ -584,7 +584,7 @@ if ($ERST3) {
 
 # HHEd (tree-based context clustering)
 if ($CXCL2) {
-   print_time("tree-based context clustering 2nd 011/034");
+   print_time("tree-based context clustering 2nd 011/039");
 
    # convert cmp stats to duration ones
    convstats();
@@ -609,7 +609,7 @@ if ($CXCL2) {
 
 # HERest (embedded reestimation (re-clustered))
 if ($ERST4) {
-   print_time("embedded reestimation (re-clustered) 012/034");
+   print_time("embedded reestimation (re-clustered) 012/039");
 
    for ( $i = 1 ; $i <= $nIte ; $i++ ) {
       print("\nIteration $i of Embedded Re-estimation\n");
@@ -625,9 +625,9 @@ if ($ERST4) {
 
 # HSMMAlign (forced alignment for no-silent GV)
 if ($FALGN) {
-   print_time("forced alignment for no-silent GV 013/034");
+   print_time("forced alignment for no-silent GV 013/039");
 
-   if ( ( $useGV && $nosilgv && @slnt > 0 ) || $useMSPF || $useDNN ) {
+   if ( ( $useHmmGV && $nosilgv && @slnt > 0 ) || $useMSPF || $useDNN ) {
 
       # make directory
       mkdir "$gvdir/fal",       0755;
@@ -646,9 +646,9 @@ if ($FALGN) {
 
 # making global variance
 if ($MCDGV) {
-   print_time("making global variance 014/034");
+   print_time("making global variance 014/039");
 
-   if ($useGV) {
+   if ($useHmmGV) {
 
       # make directories
       mkdir "$gvdatdir",      0755;
@@ -700,9 +700,9 @@ if ($MCDGV) {
 
 # HHEd (making unseen models (GV))
 if ($MKUNG) {
-   print_time("making unseen models (GV) 015/034");
+   print_time("making unseen models (GV) 015/039");
 
-   if ($useGV) {
+   if ($useHmmGV) {
       if ($cdgv) {
          make_edfile_mkunseen_gv();
          $commandline = "$HHEd{'trn'} -H $clusmmf{'gv'} -w $clsammf{'gv'} $mku{'gv'} $lst{'gv'} > $logdir/015_HHEd_makeUnseen_GV.log";
@@ -715,9 +715,9 @@ if ($MKUNG) {
    }
 }
 
-# HMGenS & SPTK (training modulation spectrum-based postfilter)
-if ($TMSPF) {
-   print_time("training modulation spectrum-based postfilter 016/034");
+# HMGenS & SPTK (training modulation spectrum-based postfilter (1mix))
+if ($MSPF1) {
+   print_time("training modulation spectrum-based postfilter 016/039");
 
    if ($useMSPF) {
 
@@ -752,7 +752,7 @@ if ($TMSPF) {
 
 # HHEd (making unseen models (1mix))
 if ($MKUN1) {
-   print_time("making unseen models (1mix) 017");
+   print_time("making unseen models (1mix) 017/039");
 
    foreach $set (@SET) {
       make_edfile_mkunseen($set);
@@ -765,7 +765,7 @@ if ($MKUN1) {
 
 # HMGenS (generating speech parameter sequences (1mix))
 if ($PGEN1) {
-   print_time("generating speech parameter sequences (1mix) 018/034");
+   print_time("generating speech parameter sequences (1mix) 018/039");
 
    $mix = '1mix';
    $dir = "${prjdir}/gen/ver${ver}/$mix/$pgtype";
@@ -780,19 +780,25 @@ if ($PGEN1) {
 
 # SPTK (synthesizing waveforms (1mix))
 if ($WGEN1) {
-   print_time("synthesizing waveforms (1mix) 019/034");
+   print_time("synthesizing waveforms (1mix) 019/039");
 
    $mix = '1mix';
    $dir = "${prjdir}/gen/ver${ver}/$mix/$pgtype";
-
-   gen_wave("$dir");
+   if ($useMSPF) {
+      $pf = 2;
+   }
+   elsif ( !$useHmmGV ) {
+      $pf = 1;
+   }
+   else {
+      $pf = 0;
+   }
+   gen_wave( "$dir", $pf );
 }
-
-$useMSPF = 0;    # turn off modulation spectrum-based postfilter for following step
 
 # HHEd (converting mmfs to the HTS voice format)
 if ( $CONVM && !$usestraight ) {
-   print_time("converting mmfs to the HTS voice format 020/034");
+   print_time("converting mmfs to the HTS voice format 020/039");
 
    # models and trees
    foreach $set (@SET) {
@@ -812,7 +818,7 @@ if ( $CONVM && !$usestraight ) {
    }
 
    # gv pdfs
-   if ($useGV) {
+   if ($useHmmGV) {
       my $s = 1;
       foreach $type (@cmp) {    # convert hts_engine format
          make_edfile_convert_gv($type);
@@ -834,14 +840,14 @@ if ( $CONVM && !$usestraight ) {
 
 # hts_engine (synthesizing waveforms using hts_engine)
 if ( $ENGIN && !$usestraight ) {
-   print_time("synthesizing waveforms using hts_engine 021/034");
+   print_time("synthesizing waveforms using hts_engine 021/039");
 
    $dir = "${prjdir}/gen/ver${ver}/hts_engine";
    mkdir ${dir}, 0755;
 
    # hts_engine command line & options
    $hts_engine = "$ENGINE -m ${voice}/${dset}_${spkr}.htsvoice ";
-   if ( !$useGV ) {
+   if ( !$useHmmGV ) {
       if ( $gm == 0 ) {
          $hts_engine .= "-b " . ( $pf_mcp - 1.0 ) . " ";
       }
@@ -868,7 +874,7 @@ if ( $ENGIN && !$usestraight ) {
 
 # making training data for deep neural network
 if ($MKDAT) {
-   print_time("making training data for deep neural network 022/034");
+   print_time("making training data for deep neural network 022/039");
 
    if ($useDNN) {
       mkdir "$dnndir/ffi",       0755;
@@ -880,19 +886,48 @@ if ($MKDAT) {
 
 # TensorFlow (training a deep neural network)
 if ($TRDNN) {
-   print_time("training a deep neural network 023/034");
+   print_time("training a deep neural network 023/039");
 
    if ($useDNN) {
       mkdir "$dnnmodels", 0755;
 
-      make_dnn_config();
-      shell("$PYTHON $datdir/scripts/DNNTraining.py -C $cfg{'tdn'} -S $scp{'fio'} -H $dnnmodels -z $var{'ffo'} > $logdir/023_DNNTraining.log");
+      shell("$PYTHON $datdir/scripts/DNNTraining.py -C $cfg{'tdn'} -S $scp{'tdn'} -H $dnnmodels -z $datdir/stats");
+   }
+}
+
+# HMGenS & SPTK (training modulation spectrum-based postfilter (dnn))
+if ($MSPFD) {
+   print_time("training modulation spectrum-based postfilter (dnn) 024/039");
+
+   if ( $useDNN && $useMSPF ) {
+
+      $mix     = 'dnn';
+      $gentype = "gen/$mix/$pgtype";
+
+      # make directories
+      mkdir "$mspfdir/gen",              0755;
+      mkdir "$mspfdir/gen/$mix",         0755;
+      mkdir "$mspfdir/gen/$mix/$pgtype", 0755;
+      foreach $dir ( 'dat', 'stats' ) {
+         mkdir "$mspfdir/$dir",                  0755;
+         mkdir "$mspfdir/$dir/nat",              0755;
+         mkdir "$mspfdir/$dir/gen",              0755;
+         mkdir "$mspfdir/$dir/gen/$mix",         0755;
+         mkdir "$mspfdir/$dir/gen/$mix/$pgtype", 0755;
+      }
+
+      # synthesize speech parameters using model alignment
+      shell("$PYTHON $datdir/scripts/DNNSynthesis.py -C $cfg{'sdn'} -S $scp{'tdn'} -H $dnnmodels -M $mspfdir/$gentype");
+      gen_param("$mspfdir/$gentype");
+
+      # estimate statistics for modulation spectrum
+      make_mspf($gentype);
    }
 }
 
 # TensorFlow & SPTK (generating speech parameter sequences (dnn))
 if ($PGEND) {
-   print_time("generating speech parameter sequences (dnn) 024/034");
+   print_time("generating speech parameter sequences (dnn) 025/039");
 
    if ($useDNN) {
       $mix = 'dnn';
@@ -901,18 +936,19 @@ if ($PGEND) {
       mkdir $dir, 0755;
 
       # predict duration from HMMs
-      $commandline = "$HMGenS -S $scp{'gen'} -c $pgtype -H $rclammf{'cmp'}.1mix -N $rclammf{'dur'}.1mix -M $dir $tiedlst{'cmp'} $tiedlst{'dur'} > $logdir/024_HMGenS_dnn.log";
+      $commandline = "$HMGenS -S $scp{'gen'} -c $pgtype -H $rclammf{'cmp'}.1mix -N $rclammf{'dur'}.1mix -M $dir $tiedlst{'cmp'} $tiedlst{'dur'} > $logdir/025_HMGenS_dnn.log";
       print $commandline."\n";
       shell($commandline);
-      shell("rm -f $dir/*.{mgc,lf0,bap}");
+      foreach $type (@cmp) {
+         shell("rm -f $dir/*.$type");
+      }
 
       mkdir "$dnnffidir{'gen'}", 0755;
       convert_dur2lab($dir);
       make_gen_data_dnn($dir);
 
       # generate parameter
-      make_dnn_config();
-      shell("$PYTHON $datdir/scripts/DNNSynthesis.py -C $cfg{'sdn'} -S $scp{'ffi'} -H $dnnmodels -M $dir");
+      shell("$PYTHON $datdir/scripts/DNNSynthesis.py -C $cfg{'sdn'} -S $scp{'sdn'} -H $dnnmodels -M $dir");
 
       # generate smooth parameter sequence
       gen_param("$dir");
@@ -921,21 +957,111 @@ if ($PGEND) {
 
 # SPTK (synthesizing waveforms (dnn))
 if ($WGEND) {
-   print_time("synthesizing waveforms (dnn) 025/034");
+   print_time("synthesizing waveforms (dnn) 026/039");
 
    if ($useDNN) {
       $mix = 'dnn';
       $dir = "${prjdir}/gen/ver${ver}/$mix/$pgtype";
-
-      gen_wave("$dir");
+      if ($useMSPF) {
+         $pf = 2;
+      }
+      else {
+         $pf = 1;
+      }
+      gen_wave( "$dir", $pf );
    }
 }
 
-$useDNN = 0;    # turn off DNN flag for following step
+# TensorFlow (trajectory training considering global variance)
+if ($TRJGV) {
+   print_time("trajectory training considering global variance 027/039");
+
+   if ($useDNN) {
+      mkdir "$dnnmodelsdir{'trj'}", 0755;
+
+      shell("cp $dnnmodels/model.ckpt.* $dnnmodelsdir{'trj'}");
+      shell("$PYTHON $datdir/scripts/DNNTraining.py -C $cfg{'trj'} -S $scp{'tdn'} -H $dnnmodelsdir{'trj'} -z $datdir/stats -w $windir");
+   }
+}
+
+# HMGenS & SPTK (training modulation spectrum-based postfilter (trj))
+if ($MSPFT) {
+   print_time("training modulation spectrum-based postfilter (trj) 028/039");
+
+   if ( $useDNN && $useMSPF ) {
+
+      $mix     = 'trj';
+      $gentype = "gen/$mix/$pgtype";
+
+      # make directories
+      mkdir "$mspfdir/gen",              0755;
+      mkdir "$mspfdir/gen/$mix",         0755;
+      mkdir "$mspfdir/gen/$mix/$pgtype", 0755;
+      foreach $dir ( 'dat', 'stats' ) {
+         mkdir "$mspfdir/$dir",                  0755;
+         mkdir "$mspfdir/$dir/nat",              0755;
+         mkdir "$mspfdir/$dir/gen",              0755;
+         mkdir "$mspfdir/$dir/gen/$mix",         0755;
+         mkdir "$mspfdir/$dir/gen/$mix/$pgtype", 0755;
+      }
+
+      # synthesize speech parameters using model alignment
+      shell("$PYTHON $datdir/scripts/DNNSynthesis.py -C $cfg{'sdn'} -S $scp{'tdn'} -H $dnnmodelsdir{'trj'} -M $mspfdir/$gentype");
+      gen_param("$mspfdir/$gentype");
+
+      # estimate statistics for modulation spectrum
+      make_mspf($gentype);
+   }
+}
+
+# TensorFlow & SPTK (generating speech parameter sequences (trj))
+if ($PGENT) {
+   print_time("generating speech parameter sequences (trj) 029/039");
+
+   if ($useDNN) {
+      $mix = 'trj';
+      $dir = "${prjdir}/gen/ver${ver}/$mix/$pgtype";
+      mkdir "${prjdir}/gen/ver${ver}/$mix", 0755;
+      mkdir $dir, 0755;
+
+      # predict duration from HMMs
+      shell("$HMGenS -S $scp{'gen'} -c $pgtype -H $rclammf{'cmp'}.1mix -N $rclammf{'dur'}.1mix -M $dir $tiedlst{'cmp'} $tiedlst{'dur'}");
+      foreach $type (@cmp) {
+         shell("rm -f $dir/*.$type");
+      }
+
+      mkdir "$dnnffidir{'gen'}", 0755;
+      convert_dur2lab($dir);
+      make_gen_data_dnn($dir);
+
+      # generate parameter
+      shell("$PYTHON $datdir/scripts/DNNSynthesis.py -C $cfg{'sdn'} -S $scp{'sdn'} -H $dnnmodelsdir{'trj'} -M $dir");
+
+      # generate smooth parameter sequence
+      gen_param("$dir");
+   }
+}
+
+# SPTK (synthesizing waveforms (trj))
+if ($WGENT) {
+   print_time("synthesizing waveforms (trj) 030/039");
+
+   if ($useDNN) {
+      $mix = 'trj';
+      $dir = "${prjdir}/gen/ver${ver}/$mix/$pgtype";
+      if ($useMSPF) {
+         $pf = 2;
+      }
+      else {
+         $pf = 1;
+      }
+      gen_wave( "$dir", $pf );
+   }
+}
 
 # HERest (semi-tied covariance matrices)
 if ($SEMIT) {
-   print_time("semi-tied covariance matrices 026/034");
+   print_time("semi-tied covariance matrices 031/039");
 
    foreach $set (@SET) {
       shell("cp $reclmmf{$set} $stcmmf{$set}");
@@ -945,7 +1071,7 @@ if ($SEMIT) {
 
    make_stc_base();
 
-   $commandline = "$HERest{'ful'} -H $stcmmf{'cmp'} -N $stcmmf{'dur'} -M $model{'cmp'} -R $model{'dur'} $opt $lst{'ful'} $lst{'ful'} > $logdir/026_HERest_semi-tied.log";
+   $commandline = "$HERest{'ful'} -H $stcmmf{'cmp'} -N $stcmmf{'dur'} -M $model{'cmp'} -R $model{'dur'} $opt $lst{'ful'} $lst{'ful'} > $logdir/031_HERest_semi-tied.log";
    print $commandline."\n";
    shell($commandline);
 
@@ -957,11 +1083,11 @@ if ($SEMIT) {
 
 # HHEd (making unseen models (stc))
 if ($MKUNS) {
-   print_time("making unseen models (stc) 027/034");
+   print_time("making unseen models (stc) 032/039");
 
    foreach $set (@SET) {
       make_edfile_mkunseen($set);
-      $commandline = "$HHEd{'trn'} -H $stcmmf{$set} -w $stcammf{$set} $mku{$set} $lst{'ful'} > $logdir/027_HHEd_stc_makeUnseen_$set.log";
+      $commandline = "$HHEd{'trn'} -H $stcmmf{$set} -w $stcammf{$set} $mku{$set} $lst{'ful'} > $logdir/032_HHEd_stc_makeUnseen_$set.log";
       print $commandline."\n";
       shell($commandline);
    }
@@ -969,7 +1095,7 @@ if ($MKUNS) {
 
 # HMGenS (generating speech parameter sequences (stc))
 if ($PGENS) {
-   print_time("generating speech parameter sequences (stc) 028/034");
+   print_time("generating speech parameter sequences (stc) 033/039");
 
    $mix = 'stc';
    $dir = "${prjdir}/gen/ver${ver}/$mix/$pgtype";
@@ -977,28 +1103,33 @@ if ($PGENS) {
    mkdir $dir, 0755;
 
    # generate parameter
-   $commandline = "$HMGenS -S $scp{'gen'} -c $pgtype -H $stcammf{'cmp'} -N $stcammf{'dur'} -M $dir $tiedlst{'cmp'} $tiedlst{'dur'} > $logdir/028_HMGenS_stc.log";
+   $commandline = "$HMGenS -S $scp{'gen'} -c $pgtype -H $stcammf{'cmp'} -N $stcammf{'dur'} -M $dir $tiedlst{'cmp'} $tiedlst{'dur'} > $logdir/033_HMGenS_stc.log";
    print $commandline."\n";
    shell($commandline);
 }
 
 # SPTK (synthesizing waveforms (stc))
 if ($WGENS) {
-   print_time("synthesizing waveforms (stc) 029/034");
+   print_time("synthesizing waveforms (stc) 034/039");
 
    $mix = 'stc';
    $dir = "${prjdir}/gen/ver${ver}/$mix/$pgtype";
-
-   gen_wave("$dir");
+   if ( !$useHmmGV ) {
+      $pf = 1;
+   }
+   else {
+      $pf = 0;
+   }
+   gen_wave( "$dir", $pf );
 }
 
 # HHED (increasing the number of mixture components (1mix -> 2mix))
 if ($UPMIX) {
-   print_time("increasing the number of mixture components (1mix -> 2mix) 030/034");
+   print_time("increasing the number of mixture components (1mix -> 2mix) 035/039");
 
    $set = 'cmp';
    make_edfile_upmix($set);
-   $commandline = "$HHEd{'trn'} -H $reclmmf{$set} -w $reclmmf{$set}.2mix $upm{$set} $lst{'ful'} > $logdir/030_HHEd_1mix-2mix.log";
+   $commandline = "$HHEd{'trn'} -H $reclmmf{$set} -w $reclmmf{$set}.2mix $upm{$set} $lst{'ful'} > $logdir/035_HHEd_1mix-2mix.log";
    print $commandline."\n";
    shell($commandline);
 
@@ -1014,11 +1145,11 @@ $rclammf{'cmp'} .= ".2mix";
 
 # HERest (embedded reestimation (2mix))
 if ($ERST5) {
-   print_time("embedded reestimation (2mix) 031/034");
+   print_time("embedded reestimation (2mix) 036/039");
 
    for ( $i = 1 ; $i <= $nIte ; $i++ ) {
       print("\nIteration $i of Embedded Re-estimation\n");
-      $commandline = "$HERest{'ful'} -H $reclmmf{'cmp'} -N $reclmmf{'dur'} -M $model{'cmp'} -R $model{'dur'} $lst{'ful'} $lst{'ful'} > $logdir/031_HERest_2mix_em_$i.log";
+      $commandline = "$HERest{'ful'} -H $reclmmf{'cmp'} -N $reclmmf{'dur'} -M $model{'cmp'} -R $model{'dur'} $lst{'ful'} $lst{'ful'} > $logdir/036_HERest_2mix_em_$i.log";
       shell($commandline);
    }
 
@@ -1030,11 +1161,11 @@ if ($ERST5) {
 
 # HHEd (making unseen models (2mix))
 if ($MKUN2) {
-   print_time("making unseen models (2mix) 032/034");
+   print_time("making unseen models (2mix) 037/039");
 
    foreach $set (@SET) {
       make_edfile_mkunseen($set);
-      $commandline = "$HHEd{'trn'} -H $reclmmf{$set} -w $rclammf{$set} $mku{$set} $lst{'ful'} > $logdir/032_HHEd_2mix_makeUnseen_$set.log";
+      $commandline = "$HHEd{'trn'} -H $reclmmf{$set} -w $rclammf{$set} $mku{$set} $lst{'ful'} > $logdir/037_HHEd_2mix_makeUnseen_$set.log";
       print $commandline."\n";
       shell($commandline);
    }
@@ -1042,7 +1173,7 @@ if ($MKUN2) {
 
 # HMGenS (generating speech parameter sequences (2mix))
 if ($PGEN2) {
-   print_time("generating speech parameter sequences (2mix) 033/034");
+   print_time("generating speech parameter sequences (2mix) 038/039");
 
    $mix = '2mix';
    $dir = "${prjdir}/gen/ver${ver}/$mix/$pgtype";
@@ -1050,18 +1181,24 @@ if ($PGEN2) {
    mkdir $dir, 0755;
 
    # generate parameter
-   $commandline = "$HMGenS -S $scp{'gen'} -c $pgtype -H $rclammf{'cmp'} -N $rclammf{'dur'} -M $dir $tiedlst{'cmp'} $tiedlst{'dur'} > $logdir/033_HMGenS_2mix.log";
+   $commandline = "$HMGenS -S $scp{'gen'} -c $pgtype -H $rclammf{'cmp'} -N $rclammf{'dur'} -M $dir $tiedlst{'cmp'} $tiedlst{'dur'} > $logdir/038_HMGenS_2mix.log";
    print $commandline."\n";
    shell($commandline);
 }
 
 # SPTK (synthesizing waveforms (2mix))
 if ($WGEN2) {
-   print_time("synthesizing waveforms (2mix) 034/034");
+   print_time("synthesizing waveforms (2mix) 039/039");
 
    $mix = '2mix';
    $dir = "${prjdir}/gen/ver${ver}/$mix/$pgtype";
 
+   if ( !$useHmmGV ) {
+      $pf = 1;
+   }
+   else {
+      $pf = 0;
+   }
    gen_wave("$dir");
    print "Completely Done!";
 }

@@ -108,7 +108,7 @@ analysis: features cmp ffo stats
 
 #labels: lab mlf list scp question
 
-labels: mlf list scp
+labels: mlf list scp question
 
 features:
 	# Extracting features from raw audio

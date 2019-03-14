@@ -11,7 +11,7 @@ ffo: Frame-by-frame acoustic output features (4-byte float, natural endian).
 
 labels: Context-independent and -dependent labels in HTK label format (ascii).
 
-lf0: Log-fundamental frequency values extracted by SPTK (4-byte float, natural endian).
+lf0: Log fundamental frequency values extracted by SPTK (4-byte float, natural endian).
 
 lists: Context-independent and -dependent model lists (ascii).
 

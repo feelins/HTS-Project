@@ -5,7 +5,7 @@
 #           http://hts.sp.nitech.ac.jp/                             #
 # ----------------------------------------------------------------- #
 #                                                                   #
-#  Copyright (c) 2001-2016  Nagoya Institute of Technology          #
+#  Copyright (c) 2001-2017  Nagoya Institute of Technology          #
 #                           Department of Computer Science          #
 #                                                                   #
 #                2001-2008  Tokyo Institute of Technology           #
@@ -187,7 +187,7 @@ $daem_alpha  = @DAEMALPHA@;     # schedule of updating temperature parameter for
 $pgtype     = @PGTYPE@;     # parameter generation algorithm (0 -> Cholesky, 1 -> MixHidden, 2 -> StateHidden)
 $maxEMiter  = @MAXEMITER@;  # max EM iteration
 $EMepsilon  = @EMEPSILON@;  # convergence factor for EM iteration
-$useGV      = @USEGV@;      # turn on GV
+$useHmmGV   = @USEHMMGV@;   # turn on GV
 $maxGViter  = @MAXGVITER@;  # max GV iteration
 $GVepsilon  = @GVEPSILON@;  # convergence factor for GV iteration
 $minEucNorm = @MINEUCNORM@; # minimum Euclid norm for GV iteration
@@ -209,17 +209,18 @@ $nHiddenUnits = '@NHIDDENUNITS@'; # number of hidden units in each layer
 $activation   = @ACTIVATION@;     # activation function for hidden units  (0 -> Linear, 1 -> Sigmoid, 2 -> Tanh, 3 -> ReLU)
 $optimizer    = @OPTIMIZER@;      # optimizer (0 -> SGD, 1 -> Momentum, 2 -> AdaGrad, 3-> AdaDelta, 4 -> Adam, 5 -> RMSprop)
 $learnRate    = @LEARNRATE@;      # learning rate
+$trjLearnRate = @TRJLEARNRATE@;   # learning rate for trajectory training
+$dnnGVWeight  = @DNNGVWEIGHT@;    # weight for GV
 $keepProb     = @KEEPPROB@;       # probability for not randomly setting activities to zero
-$useQueue     = @USEQUEUE@;       # use queue to load training data
 $queueSize    = @QUEUESIZE@;      # queue size
 $batchSize    = @BATCHSIZE@;      # mini-batch size
 $nEpoch       = @NEPOCH@;         # number of epochs
+$nTrjEpoch    = @NTRJEPOCH@;      # number of epochs for trajectory training
 $nThread      = @NTHREAD@;        # number of threads
-$restoreCkpt  = @RESTORECKPT@;    # checkpoint for parameter generation
 $randomSeed   = @RANDOMSEED@;     # random seed used for initialization
 $nKeep        = 5;                # number of models to keep
 $logInterval  = 100;              # output training log at regular steps
-$saveInterval = 5000;             # save model at regular steps
+$saveInterval = 10000;            # save model at regular steps
 
 
 # Directories & Commands ===============
@@ -247,39 +248,40 @@ $HMGENS    = '@HMGENS@';
 $ENGINE    = '@ENGINE@';
 
 # SPTK commands
-$X2X       = '@X2X@';
-$FREQT     = '@FREQT@';
-$C2ACR     = '@C2ACR@';
-$VOPR      = '@VOPR@';
-$VSUM      = '@VSUM@';
-$MC2B      = '@MC2B@';
-$SOPR      = '@SOPR@';
-$B2MC      = '@B2MC@';
-$EXCITE    = '@EXCITE@';
-$LSP2LPC   = '@LSP2LPC@';
-$MGC2MGC   = '@MGC2MGC@';
-$MGLSADF   = '@MGLSADF@';
-$MERGE     = '@MERGE@';
-$BCP       = '@BCP@';
-$LSPCHECK  = '@LSPCHECK@';
-$MGC2SP    = '@MGC2SP@';
-$BCUT      = '@BCUT@';
-$VSTAT     = '@VSTAT@';
-$NAN       = '@NAN@';
-$DFS       = '@DFS@';
-$SWAB      = '@SWAB@';
-$RAW2WAV   = '@RAW2WAV@';
-$FRAME     = '@FRAME@';
-$WINDOW    = '@WINDOW@';
-$SPEC      = '@SPEC@';
-$TRANSPOSE = '@TRANSPOSE@';
-$PHASE     = '@PHASE@';
-$IFFTR     = '@IFFTR@';
-$MLPG      = '@MLPG@';
+$X2X         = '@X2X@';
+$FREQT       = '@FREQT@';
+$C2ACR       = '@C2ACR@';
+$VOPR        = '@VOPR@';
+$VSUM        = '@VSUM@';
+$MC2B        = '@MC2B@';
+$SOPR        = '@SOPR@';
+$B2MC        = '@B2MC@';
+$EXCITE      = '@EXCITE@';
+$LSP2LPC     = '@LSP2LPC@';
+$MGC2MGC     = '@MGC2MGC@';
+$MGLSADF     = '@MGLSADF@';
+$MERGE       = '@MERGE@';
+$BCP         = '@BCP@';
+$LSPCHECK    = '@LSPCHECK@';
+$MGC2SP      = '@MGC2SP@';
+$BCUT        = '@BCUT@';
+$VSTAT       = '@VSTAT@';
+$NAN         = '@NAN@';
+$DFS         = '@DFS@';
+$SWAB        = '@SWAB@';
+$RAW2WAV     = '@RAW2WAV@';
+$FRAME       = '@FRAME@';
+$WINDOW      = '@WINDOW@';
+$SPEC        = '@SPEC@';
+$TRANSPOSE   = '@TRANSPOSE@';
+$PHASE       = '@PHASE@';
+$IFFTR       = '@IFFTR@';
+$MLPG        = '@MLPG@';
+$INTERPOLATE = '@INTERPOLATE@';
 
 # MATLAB & STRAIGHT
-$MATLAB    = '@MATLAB@';
-$STRAIGHT  = '@STRAIGHT@';
+$MATLAB   = '@MATLAB@';
+$STRAIGHT = '@STRAIGHT@';
 
 
 # Switch ================================
@@ -296,10 +298,10 @@ $UNTIE = 1; # untying the parameter sharing structure 009
 $ERST3 = 1; # embedded reestimation (untied) 010
 $CXCL2 = 1; # tree-based context clustering 011
 $ERST4 = 1; # embedded reestimation (re-clustered) 012
-$FALGN = 1; # forced alignment for no-silent GV 013
+$FALGN = 1; # forced alignment 013
 $MCDGV = 1; # making global variance 014
 $MKUNG = 1; # making unseen models (GV) 015
-$TMSPF = 1; # training modulation spectrum-based postfilter 016
+$MSPF1 = 1; # training modulation spectrum-based postfilter (1mix) 016
 $MKUN1 = 1; # making unseen models (1mix) 017
 $PGEN1 = 1; # generating speech parameter sequences (1mix) 018
 $WGEN1 = 1; # synthesizing waveforms (1mix) 019
@@ -307,16 +309,21 @@ $CONVM = 1; # converting mmfs to the hts_engine file format 020
 $ENGIN = 1; # synthesizing waveforms using hts_engine 021
 $MKDAT = 1; # making training data for deep neural network 022
 $TRDNN = 1; # training a deep neural network 023
-$PGEND = 1; # generating speech parameter sequences (dnn) 024
-$WGEND = 1; # synthesizing waveforms (dnn) 025
-$SEMIT = 1; # semi-tied covariance matrices 026
-$MKUNS = 1; # making unseen models (stc) 027
-$PGENS = 1; # generating speech parameter sequences (stc) 028
-$WGENS = 1; # synthesizing waveforms (stc) 029
-$UPMIX = 1; # increasing the number of mixture components (1mix -> 2mix) 030
-$ERST5 = 1; # embedded reestimation (2mix) 031
-$MKUN2 = 1; # making unseen models (2mix) 032
-$PGEN2 = 1; # generating speech parameter sequences (2mix) 033
-$WGEN2 = 1; # synthesizing waveforms (2mix) 034
+$MSPFD = 1; # training modulation spectrum-based postfilter (dnn) 024
+$PGEND = 1; # generating speech parameter sequences (dnn) 025
+$WGEND = 1; # synthesizing waveforms (dnn) 026
+$TRJGV = 1; # trajectory training considering global variance 027
+$MSPFT = 1; # training modulation spectrum-based postfilter (trj) 028
+$PGENT = 1; # generating speech parameter sequences (trj) 029
+$WGENT = 1; # synthesizing waveforms (trj) 030
+$SEMIT = 1; # semi-tied covariance matrices 031
+$MKUNS = 1; # making unseen models (stc) 032
+$PGENS = 1; # generating speech parameter sequences (stc) 033
+$WGENS = 1; # synthesizing waveforms (stc) 034
+$UPMIX = 1; # increasing the number of mixture components (1mix -> 2mix) 035
+$ERST5 = 1; # embedded reestimation (2mix) 036
+$MKUN2 = 1; # making unseen models (2mix) 037
+$PGEN2 = 1; # generating speech parameter sequences (2mix) 038
+$WGEN2 = 1; # synthesizing waveforms (2mix) 039
 
 1;

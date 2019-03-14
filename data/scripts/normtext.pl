@@ -5,7 +5,7 @@
 #           http://hts.sp.nitech.ac.jp/                             #
 # ----------------------------------------------------------------- #
 #                                                                   #
-#  Copyright (c) 2012-2016  Nagoya Institute of Technology          #
+#  Copyright (c) 2012-2017  Nagoya Institute of Technology          #
 #                           Department of Computer Science          #
 #                                                                   #
 # All rights reserved.                                              #
@@ -40,7 +40,7 @@
 # ----------------------------------------------------------------- #
 
 if ( @ARGV != 1 ) {
-   print "txtnorm.pl infile\n";
+   print "normtext.pl infile\n";
    exit( 0 );
 }
 

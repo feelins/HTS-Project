@@ -5,7 +5,7 @@
 #           http://hts.sp.nitech.ac.jp/                             #
 # ----------------------------------------------------------------- #
 #                                                                   #
-#  Copyright (c) 2014-2016  Nagoya Institute of Technology          #
+#  Copyright (c) 2014-2017  Nagoya Institute of Technology          #
 #                           Department of Computer Science          #
 #                                                                   #
 # All rights reserved.                                              #

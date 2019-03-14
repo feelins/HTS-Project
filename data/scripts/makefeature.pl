@@ -5,7 +5,7 @@
 #           http://hts.sp.nitech.ac.jp/                             #
 # ----------------------------------------------------------------- #
 #                                                                   #
-#  Copyright (c) 2014-2016  Nagoya Institute of Technology          #
+#  Copyright (c) 2014-2017  Nagoya Institute of Technology          #
 #                           Department of Computer Science          #
 #                                                                   #
 # All rights reserved.                                              #
@@ -41,8 +41,11 @@
 
 use strict;
 
-if ( @ARGV != 3 ) {
-   die "ERROR: makefeature.pl config_file frame_shift(0.00001sec) input_file \n";
+if ( @ARGV != 1 && @ARGV != 3 ) {
+   my $msg = "";
+   $msg .= "ERROR: makefeature.pl config_file                                    (output number of features)\n";
+   $msg .= "       makefeature.pl config_file frame_shift(0.00001sec) input_file (output features)\n";
+   die "$msg";
 }
 
 my $config_file = $ARGV[0];
@@ -175,6 +178,12 @@ while ( my $line = <I> ) {
    push( @feature_max,  $max );
 }
 close(I);
+
+if ( $frame_shift eq "" || $input_file eq "" ) {
+   my $size = @feature_name;
+   print "$size\n";
+   exit(0);
+}
 
 my $label_level       = "";    # state, phoneme
 my @label_start       = ();

@@ -5,7 +5,7 @@
 #           http://hts.sp.nitech.ac.jp/                             #
 # ----------------------------------------------------------------- #
 #                                                                   #
-#  Copyright (c) 2014-2016  Nagoya Institute of Technology          #
+#  Copyright (c) 2014-2017  Nagoya Institute of Technology          #
 #                           Department of Computer Science          #
 #                                                                   #
 # All rights reserved.                                              #
@@ -179,12 +179,12 @@ for ( my $i = 0 ; $i < @feature_name ; $i++ ) {
       {
          my $patt = $feature_patt[$i];
          $patt =~ s/\%d/xx/g;
-         print "QS \"$feature_name[$i]==xx\" \{$patt\}\n";
+         printf "QS \"$feature_name[$i]==xx\" \{$patt\}\n";
       }
       for ( my $j = $feature_min[$i] ; $j <= @feature_max[$i] ; $j++ ) {
          my $patt = $feature_patt[$i];
          $patt =~ s/\%d/$j/g;
-         print "QS \"$feature_name[$i]==$j\" \{$patt\}\n";
+         printf "QS \"$feature_name[$i]==$j\" \{$patt\}\n";
       }
       for ( my $j = $feature_min[$i] + 1 ; $j < $feature_max[$i] ; $j++ ) {
          my $patt = "";
@@ -197,11 +197,11 @@ for ( my $i = 0 ; $i < @feature_name ; $i++ ) {
             }
             $patt .= $p;
          }
-         print "QS \"$feature_name[$i]<=$j\" \{$patt\}\n";
+         printf "QS \"$feature_name[$i]<=$j\" \{$patt\}\n";
       }
    }
    elsif ( $feature_type[$i] eq "binary" ) {
-      print "QS \"$feature_name[$i]\" \{$feature_patt[$i]\}\n";
+      printf "QS \"$feature_name[$i]\" \{$feature_patt[$i]\}\n";
    }
    else {
       die "ERROR: Unknown feature type\n";
@@ -213,7 +213,7 @@ exit(0);
 sub get_patt {
    my ( $start, $end ) = @_;
 
-   if ( $start >= $end ) {
+   if ( $start > $end ) {
       die "ERROR: Cannot make patterns\n";
    }
 
@@ -222,7 +222,7 @@ sub get_patt {
       for ( my $i = $#tmp ; $i >= 0 ; $i-- ) {
          $tmp[$i] = "-" . $tmp[$i];
       }
-      return @tmp;
+      return reverse(@tmp);
    }
 
    if ( $start < 0 && $end >= 0 ) {

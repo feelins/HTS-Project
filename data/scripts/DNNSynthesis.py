@@ -5,7 +5,7 @@
 #           http://hts.sp.nitech.ac.jp/                             #
 # ----------------------------------------------------------------- #
 #                                                                   #
-#  Copyright (c) 2014-2016  Nagoya Institute of Technology          #
+#  Copyright (c) 2014-2017  Nagoya Institute of Technology          #
 #                           Department of Computer Science          #
 #                                                                   #
 # All rights reserved.                                              #
@@ -45,8 +45,10 @@ from __future__ import print_function
 
 import argparse
 import datetime
-import numpy
+import glob
+import numpy as np
 import os
+import sys
 import time
 
 from six.moves import xrange
@@ -57,8 +59,8 @@ import DNNDefine
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-z', metavar='f', dest='variance', type=str, default=None,
-                    help='set variance used for error calculation')
+parser.add_argument('-w', metavar='dir', dest='window_dir', type=str, default=None,
+                    help='set window used for trajectory training')
 parser.add_argument('-C', metavar='cf', dest='config', type=str, required=True,
                     help='set config file to cf')
 parser.add_argument('-H', metavar='dir', dest='model_dir', type=str, required=True,
@@ -86,59 +88,91 @@ def format_duration(duration):
         return '%.2f sec' % (duration)
 
 
-def format_num_parameters(num_parameters):
-    if num_parameters >= 1e+6:
-        return '%.1f M' % (num_parameters / 1e+6)
-    elif num_parameters >= 1e+3:
-        return '%.1f k' % (num_parameters / 1e+3)
+def main():
+    config = DNNDataIO.load_config(args.config)
+
+    if len(config['all_spkrs']) > 1:
+        mode = 'SAT'
     else:
-        return num_parameters
+        mode = 'SD'
 
+    # Make directories
+    if not os.path.exists(args.gen_dir):
+        os.mkdir(args.gen_dir)
+    model_path = os.path.join(args.model_dir, 'model.ckpt')
+    if config['restore_ckpt'] > 0:
+        model_path = '-'.join([model_path, str(config['restore_ckpt'])])
+    if len(glob.glob("%s*" % model_path)) == 0:
+        sys.exit('  ERROR  main: No such file %s' % model_path)
 
-def fill_feed_dict(
-        data_set, keep_prob, placeholders, batch_size, shuffle=True):
-    inputs_pl, outputs_pl, keep_prob_pl = placeholders
-    inputs_feed, outputs_feed = data_set.get_pairs(batch_size, shuffle)
-    feed_dict = {
-        inputs_pl: inputs_feed,
-        outputs_pl: outputs_feed,
-        keep_prob_pl: keep_prob
-    }
-    return feed_dict
+    # Load window for trajectory training
+    windows = []
+    if args.window_dir is not None:
+        for filename in config['window_filenames']:
+            windows.append(
+                DNNDataIO.load_window(os.path.join(args.window_dir, filename)))
+        # Assume that all features have the same number of windows.
+        num_windows = (len(config['window_filenames']) //
+                       len(config['num_feature_dimensions']))
+        window_width = len(windows[0])
+        window_vector = []
+        for i in xrange(len(config['num_feature_dimensions'])):
+            for j in xrange(window_width - 1, -1, -1):
+                for k in xrange(num_windows):
+                    window_vector.append(windows[i * num_windows + k][j])
+        window_vector = np.reshape(
+            window_vector, [len(config['num_feature_dimensions']), -1])
+        window_vector = np.repeat(
+            window_vector, config['num_feature_dimensions'], axis=0)
+        window_vector = window_vector.astype(np.float32)
 
-
-def forward(config, model, stddev):
     with tf.Graph().as_default():
-        inputs, outputs = DNNDataIO.batched_data(config['num_io_units'], 1)
-        keep_prob = tf.placeholder(tf.float32)
+        inputs = tf.placeholder(dtype=tf.float32,
+                                shape=[None, config['num_input_units']])
+        outputs = tf.placeholder(dtype=tf.float32,
+                                 shape=[None, config['num_output_units']])
 
-        predicted_outputs, _ = DNNDefine.inference(
-            inputs,
-            config['num_io_units'],
-            config['num_hidden_units'],
-            config['hidden_activation'],
-            'linear',
-            keep_prob)
+        with tf.variable_scope('model'):
+            (predicted_outputs, trained_variances, trained_gv_variances) = (
+                DNNDefine.inference(
+                    inputs,
+                    [[len(config['all_spkrs']) - 1]],
+                    config['num_io_units'],
+                    config['num_hidden_units'],
+                    len(config['all_spkrs']),
+                    sum(config['num_feature_dimensions']),
+                    config['hidden_activation'],
+                    config['output_activation'],
+                    1.0,
+                    mode))
 
-        num_parameters = DNNDefine.get_num_parameters()
-        print('Number of parameters')
-        print(' ', format_num_parameters(num_parameters))
-        print('')
-
-        cost_op = DNNDefine.cost(predicted_outputs, outputs, stddev)
+        if config['frame_by_frame']:
+            cost_op, _ = DNNDefine.cost(
+                predicted_outputs,
+                outputs,
+                trained_variances)
+        else:
+            cost_op, predicted_outputs = DNNDefine.trajectory_cost(
+                predicted_outputs,
+                outputs,
+                trained_variances,
+                trained_gv_variances,
+                config['num_feature_dimensions'],
+                config['msd_flags'],
+                num_windows,
+                window_vector)
 
         init_op = tf.group(
             tf.global_variables_initializer(),
             tf.local_variables_initializer())
-
-        saver = tf.train.Saver()
 
         sess = tf.Session(config=tf.ConfigProto(
             intra_op_parallelism_threads=config['num_threads']))
 
         sess.run(init_op)
 
-        saver.restore(sess, model)
+        saver = tf.train.Saver()
+        saver.restore(sess, model_path)
 
         input_filenames, output_filenames = DNNDataIO.get_filenames(
             args.script)
@@ -146,39 +180,57 @@ def forward(config, model, stddev):
         print_time('Start forwarding')
         for i in xrange(len(input_filenames)):
             print('  Processing %s' % input_filenames[i])
-            forward_data, num_examples = DNNDataIO.read_data_from_file(
-                [input_filenames[i], output_filenames[i]],
-                config['num_io_units'])
+            input_data = DNNDataIO.load_binary_data(input_filenames[i],
+                                                    config['num_input_units'])
+            if output_filenames[i] is not None:
+                output_data = DNNDataIO.load_binary_data(output_filenames[i],
+                                                         config['num_output_units'])
+            num_examples = len(input_data)
 
             basename = os.path.splitext(
                 os.path.basename(input_filenames[i]))[0]
-            predict_filename = os.path.join(args.gen_dir, basename)
-            if args.extension != '':
-                predict_filename += '.' + args.extension
+            basename = os.path.join(args.gen_dir, basename)
+            if args.extension == '':
+                predict_filename = basename
+            else:
+                predict_filename = basename + '.' + args.extension
 
             total_cost = 0.0
             start_time = time.time()
 
-            for j in xrange(num_examples):
-                feed_dict = fill_feed_dict(
-                    forward_data, 1.0,
-                    [inputs, outputs, keep_prob], 1, shuffle=False)
-
-                predicts, value = sess.run(
-                    [predicted_outputs, cost_op], feed_dict=feed_dict)
-
-                total_cost += value
-
-                append = False if j == 0 else True
-                DNNDataIO.write_data(predict_filename, predicts, append)
+            if config['frame_by_frame']:
+                DNNDataIO.write_binary_data(basename + '.var',
+                                            sess.run(trained_variances))
+                for j in xrange(num_examples):
+                    if output_filenames[i] is None:
+                        predicts = sess.run(predicted_outputs,
+                                            feed_dict={inputs: [input_data[j]]})
+                    else:
+                        predicts, cost = sess.run([predicted_outputs, cost_op],
+                                                  feed_dict={
+                                                      inputs: [input_data[j]],
+                                                      outputs: [output_data[j]]})
+                        total_cost += cost
+                    append = False if j == 0 else True
+                    DNNDataIO.write_binary_data(
+                        predict_filename, predicts, append)
+                total_cost = total_cost / num_examples
+            else:
+                if output_filenames[i] is None:
+                    predicts = sess.run(predicted_outputs,
+                                        feed_dict={inputs: input_data})
+                else:
+                    predicts, cost = sess.run([predicted_outputs, cost_op],
+                                              feed_dict={
+                                                  inputs: input_data,
+                                                  outputs: output_data})
+                    total_cost = cost
+                append = False
+                DNNDataIO.write_binary_data(predict_filename, predicts, append)
 
             if output_filenames[i] is not None:
                 duration = format_duration(time.time() - start_time)
-                print('')
-                print('    Evaluation')
-                print('      cost = %e (%s)' %
-                      (total_cost / num_examples, duration))
-                print('')
+                print('    Evaluation: cost = %e (%s)' % (total_cost, duration))
 
         sess.close()
 
@@ -186,23 +238,5 @@ def forward(config, model, stddev):
     print()
 
 
-def main(_):
-    config = DNNDataIO.load_config(args.config)
-
-    if not os.path.exists(args.gen_dir):
-        os.mkdir(args.gen_dir)
-    model = '-'.join([os.path.join(args.model_dir, 'model.ckpt'),
-                      str(config['restore_ckpt'])])
-
-    if args.variance is None:
-        stddev = numpy.ones(
-            config['num_output_units'], dtype=numpy.float32)
-    else:
-        variance = DNNDataIO.read_data(args.variance)
-        stddev = numpy.sqrt(variance)
-
-    forward(config, model, stddev)
-
-
 if __name__ == '__main__':
-    tf.app.run()
+    main()

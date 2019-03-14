@@ -5,7 +5,7 @@
 #           http://hts.sp.nitech.ac.jp/                             #
 # ----------------------------------------------------------------- #
 #                                                                   #
-#  Copyright (c) 2014-2016  Nagoya Institute of Technology          #
+#  Copyright (c) 2014-2017  Nagoya Institute of Technology          #
 #                           Department of Computer Science          #
 #                                                                   #
 # All rights reserved.                                              #
@@ -45,7 +45,7 @@ from __future__ import print_function
 
 import argparse
 import datetime
-import numpy
+import numpy as np
 import os
 import time
 import traceback
@@ -58,7 +58,9 @@ import DNNDefine
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-z', metavar='f', dest='variance', type=str, default=None,
+parser.add_argument('-w', metavar='dir', dest='window_dir', type=str, default=None,
+                    help='set window used for trajectory training')
+parser.add_argument('-z', metavar='dir', dest='variance_dir', type=str, default=None,
                     help='set variance used for error calculation')
 parser.add_argument('-C', metavar='cf', dest='config', type=str, required=True,
                     help='set config file to cf')
@@ -66,7 +68,7 @@ parser.add_argument('-H', metavar='dir', dest='model_dir', type=str, required=Tr
                     help='set directory to save trained models')
 parser.add_argument('-N', metavar='f', dest='valid_script', type=str, default=None,
                     help='set validation script file to f')
-parser.add_argument('-S', metavar='f', dest='script', type=str, required=True,
+parser.add_argument('-S', metavar='f', dest='train_script', type=str, required=True,
                     help='set training script file to f')
 args = parser.parse_args()
 
@@ -94,286 +96,291 @@ def format_num_parameters(num_parameters):
         return num_parameters
 
 
-def fill_feed_dict(
-        data_set, keep_prob, placeholders, batch_size, shuffle=True):
-    inputs_pl, outputs_pl, keep_prob_pl = placeholders
-    inputs_feed, outputs_feed = data_set.get_pairs(batch_size, shuffle)
-    feed_dict = {
-        inputs_pl: inputs_feed,
-        outputs_pl: outputs_feed,
-        keep_prob_pl: keep_prob
-    }
-    return feed_dict
-
-
-def train_using_queue(config, model, stddev):
-    with tf.Graph().as_default():
-        print('Preparing to read training data...', end='')
-        train_data, num_train_examples = DNNDataIO.read_data_from_queue(
-            args.script,
-            config['num_io_units'],
-            config['num_epochs'],
-            config['batch_size'],
-            config['random_seed'],
-            config['queue_size'],
-            2)
-        print(' %d examples will be fed' % num_train_examples)
-
-        if args.valid_script is None:
-            valid_data, num_valid_examples = [None, 0]
-        else:
-            print('Preparing to read training data...', end='')
-            valid_data, num_valid_examples = DNNDataIO.read_data_from_queue(
-                args.valid_script,
-                config['num_io_units'],
-                None,
-                config['batch_size'],
-                config['random_seed'],
-                config['queue_size'],
-                config['num_threads_for_queue'])
-            print(' %d examples will be fed' % num_valid_examples)
-        print('')
-
-        train_inputs, train_outputs = train_data
-        if num_valid_examples > 0:
-            valid_inputs, valid_outputs = valid_data
-
-        predicted_train_outputs, params = DNNDefine.inference(
-            train_inputs,
-            config['num_io_units'],
-            config['num_hidden_units'],
-            config['hidden_activation'],
-            config['output_activation'],
-            config['keep_prob'],
-            seed=config['random_seed'])
-
-        if num_valid_examples > 0:
-            predicted_valid_outputs, _ = DNNDefine.inference(
-                valid_inputs,
-                config['num_io_units'],
-                config['num_hidden_units'],
-                config['hidden_activation'],
-                config['output_activation'],
-                1.0,
-                given_params=params)
-
-        num_parameters = DNNDefine.get_num_parameters()
-        print('Number of parameters')
-        print(' ', format_num_parameters(num_parameters))
-        print('')
-
-        train_cost_op = DNNDefine.cost(
-            predicted_train_outputs, train_outputs, stddev)
-        if num_valid_examples > 0:
-            valid_cost_op = DNNDefine.cost(
-                predicted_valid_outputs, valid_outputs, stddev)
-
-        train_op = DNNDefine.training(
-            train_cost_op,
-            config['optimizer'],
-            config['learning_rate'])
-
-        init_op = tf.group(
-            tf.global_variables_initializer(),
-            tf.local_variables_initializer())
-
-        saver = tf.train.Saver(max_to_keep=config['num_models_to_keep'])
-
-        sess = tf.Session(config=tf.ConfigProto(
-            intra_op_parallelism_threads=config['num_threads']))
-
-        sess.run(init_op)
-
-        coord = tf.train.Coordinator()
-        threads = tf.train.start_queue_runners(sess=sess, coord=coord)
-
-        print_time('Start network training')
-        try:
-            total_cost = 0.0
-            start_time = time.time()
-
-            step = 1
-            while not coord.should_stop():
-                _, value = sess.run([train_op, train_cost_op])
-                total_cost += value
-
-                if step % config['log_interval'] == 0:
-                    avg_cost = total_cost / config['log_interval']
-                    duration = format_duration(time.time() - start_time)
-                    print('  Step %7d: cost = %e (%s)' %
-                          (step, avg_cost, duration))
-                    total_cost = 0.0
-                    start_time = time.time()
-
-                if step % config['save_interval'] == 0:
-                    saver.save(sess, model, global_step=step)
-
-                    num_steps = num_valid_examples // config['batch_size']
-                    if num_steps > 0:
-                        cost = 0.0
-                        for _ in xrange(num_steps):
-                            value = sess.run(valid_cost_op)
-                            cost += value
-
-                        avg_cost = cost / num_steps
-                        duration = format_duration(time.time() - start_time)
-                        print('')
-                        print('    Evaluation')
-                        print('      validation cost = %e (%s)' %
-                              (avg_cost, duration))
-                        print('')
-                        start_time = time.time()
-
-                step += 1
-        except tf.errors.OutOfRangeError:
-            saver.save(sess, model, global_step=step - 1)
-        finally:
-            coord.request_stop()
-
-        coord.join(threads)
-        sess.close()
-
-    print_time('End network training')
-    print()
-
-
-def train(config, model, stddev):
-    with tf.Graph().as_default():
-        print('Reading training data...', end='')
-        train_data, num_train_examples = DNNDataIO.read_data_from_script(
-            args.script,
-            config['num_io_units'],
-            shuffle=True,
-            seed=config['random_seed'])
-        print(' %d examples have been loaded' % num_train_examples)
-
-        if args.valid_script is None:
-            valid_data, num_valid_examples = [None, 0]
-        else:
-            print('Reading validation data...', end='')
-            valid_data, num_valid_examples = DNNDataIO.read_data_from_script(
-                args.valid_script,
-                config['num_io_units'],
-                shuffle=False)
-            print(' %d examples have been loaded' % num_valid_examples)
-        print('')
-
-        inputs, outputs = DNNDataIO.batched_data(
-            config['num_io_units'], config['batch_size'])
-        keep_prob = tf.placeholder(
-            tf.float32)
-
-        predicted_outputs, _ = DNNDefine.inference(
-            inputs,
-            config['num_io_units'],
-            config['num_hidden_units'],
-            config['hidden_activation'],
-            config['output_activation'],
-            keep_prob,
-            seed=config['random_seed'])
-
-        num_parameters = DNNDefine.get_num_parameters()
-        print('Number of parameters')
-        print(' ', format_num_parameters(num_parameters))
-        print('')
-
-        cost_op = DNNDefine.cost(predicted_outputs, outputs, stddev)
-
-        train_op = DNNDefine.training(
-            cost_op,
-            config['optimizer'],
-            config['learning_rate'])
-
-        init_op = tf.group(
-            tf.global_variables_initializer(),
-            tf.local_variables_initializer())
-
-        saver = tf.train.Saver(max_to_keep=config['num_models_to_keep'])
-
-        sess = tf.Session(config=tf.ConfigProto(
-            intra_op_parallelism_threads=config['num_threads']))
-        sess.run(init_op)
-
-        print_time('Start network training')
-        try:
-            total_cost = 0.0
-            start_time = time.time()
-
-            step = 1
-            while True:
-                feed_dict = fill_feed_dict(
-                    train_data, config['keep_prob'],
-                    [inputs, outputs, keep_prob],
-                    config['batch_size'])
-
-                if train_data.num_epochs >= config['num_epochs']:
-                    saver.save(sess, model, global_step=step - 1)
-                    break
-
-                _, value = sess.run([train_op, cost_op], feed_dict=feed_dict)
-                total_cost += value
-
-                if step % config['log_interval'] == 0:
-                    avg_cost = total_cost / config['log_interval']
-                    duration = format_duration(time.time() - start_time)
-                    print('  Step %7d: cost = %e (%s)' %
-                          (step, avg_cost, duration))
-                    total_cost = 0.0
-                    start_time = time.time()
-
-                if step % config['save_interval'] == 0:
-                    saver.save(sess, model, global_step=step)
-
-                    num_steps = num_valid_examples // config['batch_size']
-                    if num_steps > 0:
-                        cost = 0.0
-                        for _ in xrange(num_steps):
-                            feed_dict = fill_feed_dict(
-                                valid_data, 1.0,
-                                [inputs, outputs, keep_prob],
-                                config['batch_size'],
-                                shuffle=False)
-                            value = sess.run(cost_op, feed_dict=feed_dict)
-                            cost += value
-
-                        avg_cost = cost / num_steps
-                        duration = format_duration(time.time() - start_time)
-                        print('')
-                        print('    Evaluation')
-                        print('      validation cost = %e (%s)' %
-                              (avg_cost, duration))
-                        print('')
-                        start_time = time.time()
-
-                step += 1
-        except:
-            traceback.print_exc()
-
-        sess.close()
-
-    print_time('End network training')
-    print()
-
-
-def main(_):
+def main():
     config = DNNDataIO.load_config(args.config)
 
+    if config['adaptation']:
+        mode = 'ADAPT'
+    elif len(config['all_spkrs']) > 1:
+        mode = 'SAT'
+    else:
+        mode = 'SD'
+        config['spkr_pattern'] = None
+
+    # Make directories
     if not os.path.exists(args.model_dir):
         os.mkdir(args.model_dir)
-    model = os.path.join(args.model_dir, 'model.ckpt')
+    model_path = os.path.join(args.model_dir, 'model.ckpt')
 
-    if args.variance is None:
-        stddev = numpy.ones(
-            config['num_output_dimensions'], dtype=numpy.float32)
-    else:
-        variance = DNNDataIO.read_data(args.variance)
-        stddev = numpy.sqrt(variance)
+    # Load variance
+    if args.variance_dir is not None:
+        variances = []
+        if mode == 'SD':
+            variance = DNNDataIO.load_binary_data(
+                os.path.join(args.variance_dir, 'ffo.var'))
+            variances.append(np.squeeze(variance))
+        elif mode == 'SAT' or mode == 'ADAPT':
+            for spkr in config['all_spkrs']:
+                variance = DNNDataIO.load_binary_data(
+                    os.path.join(args.variance_dir, spkr, 'ffo.var'))
+                variances.append(np.squeeze(variance))
+        variances = np.asarray(variances, np.float32)
 
-    if config['use_queue'] > 0:
-        train_using_queue(config, model, stddev)
-    else:
-        train(config, model, stddev)
+        gv_variances = []
+        if mode == 'SD':
+            gv_variance = DNNDataIO.load_binary_data(
+                os.path.join(args.variance_dir, 'gv.var'))
+            gv_variances.append(np.squeeze(gv_variance))
+        elif mode == 'SAT' or mode == 'ADAPT':
+            for spkr in config['all_spkrs']:
+                gv_variance = DNNDataIO.load_binary_data(
+                    os.path.join(args.variance_dir, spkr, 'gv.var'))
+                gv_variances.append(np.squeeze(gv_variance))
+        gv_variances = np.asarray(gv_variances, np.float32)
+
+    # Load window for trajectory training
+    windows = []
+    if args.window_dir is not None:
+        for filename in config['window_filenames']:
+            windows.append(
+                DNNDataIO.load_window(os.path.join(args.window_dir, filename)))
+        # Assume that all features have the same number of windows.
+        num_windows = (len(config['window_filenames']) //
+                       len(config['num_feature_dimensions']))
+        window_width = len(windows[0])
+        window_vector = []
+        for i in xrange(len(config['num_feature_dimensions'])):
+            for j in xrange(window_width - 1, -1, -1):
+                for k in xrange(num_windows):
+                    window_vector.append(windows[i * num_windows + k][j])
+        window_vector = np.reshape(
+            window_vector, [len(config['num_feature_dimensions']), -1])
+        window_vector = np.repeat(
+            window_vector, config['num_feature_dimensions'], axis=0)
+        window_vector = window_vector.astype(np.float32)
+
+    with tf.Graph().as_default():
+        coord = tf.train.Coordinator()
+
+        if mode == 'SD' or mode == 'SAT':
+            print('Preparing to read training data...', end='')
+        elif mode == 'ADAPT':
+            print('Preparing to read adaptation data...', end='')
+        train_reader = DNNDataIO.DataReader(
+            config['num_io_units'],
+            config['frame_by_frame'],
+            config['queue_size'],
+            args.train_script,
+            coord,
+            spkr_pattern=config['spkr_pattern'],
+            train_spkrs=config['all_spkrs'],
+            seed=config['random_seed'])
+        train_inputs, train_outputs, train_spkr_ids = (
+            train_reader.dequeue(config['batch_size']))
+        if config['frame_by_frame']:
+            num_train_steps = (config['num_epochs'] * train_reader.num_examples //
+                               config['batch_size'])
+            print(' %d examples will be read' % train_reader.num_examples)
+        else:
+            num_train_steps = (config['num_epochs'] * train_reader.num_files //
+                               config['batch_size'])
+            print(' %d files will be read' % train_reader.num_files)
+
+        if args.valid_script is not None:
+            print('Preparing to read validation data...', end='')
+            valid_reader = DNNDataIO.DataReader(
+                config['num_io_units'],
+                config['frame_by_frame'],
+                config['queue_size'],
+                args.valid_script,
+                coord,
+                spkr_pattern=config['spkr_pattern'],
+                train_spkrs=config['all_spkrs'],
+                seed=config['random_seed'])
+            valid_inputs, valid_outputs, valid_spkr_ids = (
+                valid_reader.dequeue(config['batch_size']))
+            if config['frame_by_frame']:
+                num_valid_steps = (valid_reader.num_examples //
+                                   config['batch_size'])
+                print(' %d examples will be read' % valid_reader.num_examples)
+            else:
+                num_valid_steps = (valid_reader.num_files //
+                                   config['batch_size'])
+                print(' %d files will be read' % valid_reader.num_files)
+        print('')
+
+        with tf.variable_scope('model'):
+            (predicted_train_outputs, train_variances, train_gv_variances) = (
+                DNNDefine.inference(
+                    train_inputs,
+                    train_spkr_ids,
+                    config['num_io_units'],
+                    config['num_hidden_units'],
+                    len(config['all_spkrs']),
+                    sum(config['num_feature_dimensions']),
+                    config['hidden_activation'],
+                    config['output_activation'],
+                    config['keep_prob'],
+                    mode,
+                    seed=config['random_seed'],
+                    initial_variances=variances,
+                    initial_gv_variances=gv_variances))
+
+            if args.valid_script is not None:
+                with tf.variable_scope('model', reuse=True):
+                    (predicted_valid_outputs, valid_variances, valid_gv_variances) = (
+                        DNNDefine.inference(
+                            valid_inputs,
+                            valid_spkr_ids,
+                            config['num_io_units'],
+                            config['num_hidden_units'],
+                            len(config['all_spkrs']),
+                            sum(config['num_feature_dimensions']),
+                            config['hidden_activation'],
+                            config['output_activation'],
+                            1.0,
+                            mode))
+
+        num_parameters = DNNDefine.get_num_params()
+        print('Number of parameters: %s' %
+              format_num_parameters(num_parameters))
+
+        if config['frame_by_frame']:
+            train_cost_op, _ = DNNDefine.cost(
+                predicted_train_outputs,
+                train_outputs,
+                train_variances)
+        else:
+            train_cost_op, _ = DNNDefine.trajectory_cost(
+                predicted_train_outputs,
+                train_outputs,
+                train_variances,
+                train_gv_variances,
+                config['num_feature_dimensions'],
+                config['msd_flags'],
+                num_windows,
+                window_vector,
+                gv_weight=config['gv_weight'])
+
+        if args.valid_script is not None:
+            if config['frame_by_frame']:
+                valid_cost_op, _ = DNNDefine.cost(
+                    predicted_valid_outputs,
+                    valid_outputs,
+                    valid_variances)
+            else:
+                valid_cost_op, _ = DNNDefine.trajectory_cost(
+                    predicted_valid_outputs,
+                    valid_outputs,
+                    valid_variances,
+                    valid_gv_variances,
+                    config['num_feature_dimensions'],
+                    config['msd_flags'],
+                    num_windows,
+                    window_vector,
+                    gv_weight=config['gv_weight'])
+
+        if mode == 'SD':
+            train_op = DNNDefine.training(
+                train_cost_op,
+                config['optimizer'],
+                config['learning_rate'],
+                0.0,
+                config['learning_rate'] * 0.01)
+        elif mode == 'SAT':
+            train_op = DNNDefine.training(
+                train_cost_op,
+                config['optimizer'],
+                config['learning_rate'],
+                config['learning_rate'],
+                config['learning_rate'] * 0.01)
+        elif mode == 'ADAPT':
+            train_op = DNNDefine.training(
+                train_cost_op,
+                config['optimizer'],
+                0.0,
+                config['learning_rate'],
+                config['learning_rate'] * 0.01)
+
+        init_op = tf.group(
+            tf.global_variables_initializer(),
+            tf.local_variables_initializer())
+
+        sess = tf.Session(config=tf.ConfigProto(
+            intra_op_parallelism_threads=config['num_threads']))
+
+        sess.run(init_op)
+
+        saver = tf.train.Saver(max_to_keep=config['num_models_to_keep'])
+        if config['restore_ckpt'] >= 0:
+            print('Restoring model... ', end='')
+            filename = model_path
+            if config['restore_ckpt'] > 0:
+                filename = '-'.join([filename, str(config['restore_ckpt'])])
+            saver.restore(sess, filename)
+            print('done')
+
+        if config['adaptation']:
+            sd_tensors = DNNDefine.get_params('sd_', 'True')
+            for i in xrange(len(sd_tensors)):
+                sd_params = sess.run(sd_tensors[i])
+                sd_params[-1] = np.mean(sd_params[:-1], 0)
+                sess.run(tf.assign(sd_tensors[i], sd_params))
+
+        threads = tf.train.start_queue_runners(sess=sess, coord=coord)
+        train_reader.start(sess)
+        if args.valid_script is not None:
+            valid_reader.start(sess)
+
+        print_time('Start model training')
+        try:
+            total_cost = 0.0
+            start_time = time.time()
+
+            for step in xrange(1, num_train_steps + 1):
+                _, cost = sess.run([train_op, train_cost_op])
+                total_cost += cost
+
+                if step % config['log_interval'] == 0:
+                    avg_cost = total_cost / config['log_interval']
+                    duration = format_duration(time.time() - start_time)
+                    print('  Step %7d: cost = %e (%s)' %
+                          (step, avg_cost, duration))
+                    total_cost = 0.0
+                    start_time = time.time()
+
+                if step % config['save_interval'] == 0:
+                    print('Saving model... ', end='')
+                    saver.save(sess, model_path, global_step=step)
+                    print('done')
+
+                    start_time = time.time()
+                    if args.valid_script is not None:
+                        cost = 0.0
+                        for _ in xrange(num_valid_steps):
+                            cost += sess.run(valid_cost_op)
+                        avg_cost = cost / num_valid_steps
+                        duration = format_duration(time.time() - start_time)
+                        print('')
+                        print('    Evaluation')
+                        print('      validation cost = %e (%s)' %
+                              (avg_cost, duration))
+                        print('')
+                        start_time = time.time()
+
+        except KeyboardInterrupt:
+            print()
+
+        finally:
+            print('Saving model... ', end='')
+            saver.save(sess, model_path)
+            print('done')
+            coord.request_stop()
+            coord.join(threads)
+
+    print_time('End model training')
+    print()
 
 
 if __name__ == '__main__':
-    tf.app.run()
+    main()

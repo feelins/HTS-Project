@@ -4,7 +4,7 @@
 #           http://hts.sp.nitech.ac.jp/                             #
 # ----------------------------------------------------------------- #
 #                                                                   #
-#  Copyright (c) 2014-2016  Nagoya Institute of Technology          #
+#  Copyright (c) 2014-2017  Nagoya Institute of Technology          #
 #                           Department of Computer Science          #
 #                                                                   #
 # All rights reserved.                                              #
@@ -42,63 +42,189 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import json
-import numpy
+import numpy as np
 import os
 import re
 import struct
+import threading
+import yaml
 import ConfigParser
 
 from six.moves import xrange
 import tensorflow as tf
 
 
-class InputOutputPairs(object):
+class DataReader(object):
+    def __init__(self,
+                 num_io_dimensions,
+                 frame_by_frame,
+                 queue_size,
+                 script,
+                 coord,
+                 spkr_pattern=None,
+                 train_spkrs=None,
+                 seed=None):
+        # Dimension
+        self._num_input_dimensions, self._num_output_dimensions = num_io_dimensions
 
-    def __init__(self, inputs, outputs, seed=None):
-        assert inputs.shape[0] == outputs.shape[0]
+        # File
+        size = 0
+        files = []
+        for filenames in open(script, 'r'):
+            files.append(filenames.rstrip())
+            input_filename, _ = filenames.split(' ', 1)
+            stat = os.stat(input_filename)
+            size = size + stat.st_size
+        self._files = np.asarray(files)
+        self._num_examples = size // (4 * self._num_input_dimensions)
+        self._num_files = len(files)
 
-        self._inputs = inputs.astype(numpy.float32)
-        self._outputs = outputs.astype(numpy.float32)
-        self._num_examples = inputs.shape[0]
-        self._num_epochs = 0
+        # Speaker
+        self._spkr_pattern = spkr_pattern
+        self._spkr2id = dict()
+        for i in xrange(len(train_spkrs)):
+            self._spkr2id[train_spkrs[i]] = i
 
-        self._index = 0
-        self._rng = numpy.random.RandomState(seed)
+        # Queue
+        self._coord = coord
+        self._frame_by_frame = frame_by_frame
+        if frame_by_frame:
+            min_after_dequeue = int(queue_size * 0.8)
+            self._queue = tf.RandomShuffleQueue(
+                queue_size, min_after_dequeue,
+                ['float32', 'float32', 'int32'],
+                shapes=[[self._num_input_dimensions],
+                        [self._num_output_dimensions], [1]],
+                seed=seed)
+            self._input_placeholder = tf.placeholder(
+                tf.float32, shape=[None, self._num_input_dimensions])
+            self._output_placeholder = tf.placeholder(
+                tf.float32, shape=[None, self._num_output_dimensions])
+            self._spkr_ids_placeholder = tf.placeholder(
+                tf.int32, shape=[None, 1])
+            self._enqueue = self._queue.enqueue_many(
+                [self._input_placeholder,
+                 self._output_placeholder,
+                 self._spkr_ids_placeholder])
+        else:
+            self._queue = tf.PaddingFIFOQueue(
+                queue_size,
+                ['float32', 'float32', 'int32'],
+                shapes=[[None, self._num_input_dimensions],
+                        [None, self._num_output_dimensions], [1]])
+            self._input_placeholder = tf.placeholder(
+                tf.float32, shape=None)
+            self._output_placeholder = tf.placeholder(
+                tf.float32, shape=None)
+            self._spkr_ids_placeholder = tf.placeholder(
+                tf.int32, shape=None)
+            self._enqueue = self._queue.enqueue(
+                [self._input_placeholder,
+                 self._output_placeholder,
+                 self._spkr_ids_placeholder])
+
+        # Other
+        self._rng = np.random.RandomState(seed)
 
     @property
-    def inputs(self):
-        return self._inputs
+    def num_input_dimensions(self):
+        return self._num_input_dimensions
 
     @property
-    def outputs(self):
-        return self._outputs
+    def num_output_dimensions(self):
+        return self._num_output_dimensions
 
     @property
     def num_examples(self):
         return self._num_examples
 
     @property
-    def num_epochs(self):
-        return self._num_epochs
+    def num_files(self):
+        return self._num_files
 
-    def get_pairs(self, batch_size, shuffle=True):
-        start = self._index
-        end = self._index + batch_size
+    def dequeue(self, batch_size):
+        inputs, outputs, spkr_ids = self._queue.dequeue_many(batch_size)
+        if not self._frame_by_frame:
+            inputs = tf.squeeze(inputs, axis=0)
+            outputs = tf.squeeze(outputs, axis=0)
+        return inputs, outputs, spkr_ids
 
-        if end > self._num_examples:
-            if shuffle:
-                random_indices = numpy.arange(self._num_examples)
-                self._rng.shuffle(random_indices)
-                self._inputs = self._inputs[random_indices]
-                self._outputs = self._outputs[random_indices]
+    def start(self, sess, num_threads=1):
+        for _ in xrange(num_threads):
+            thread = threading.Thread(target=self.__loop, args=(sess,))
+            thread.daemon = True
+            thread.start()
 
-            start = 0
-            end = batch_size
-            self._num_epochs += 1
+    def __load_data(self):
+        for filenames in self._files:
+            input_filename, output_filename = filenames.split(' ', 1)
+            inputs = load_binary_data(
+                input_filename, self._num_input_dimensions)
+            num_input_examples = inputs.shape[0]
+            outputs = load_binary_data(
+                output_filename, self._num_output_dimensions)
+            num_output_examples = outputs.shape[0]
+            assert num_input_examples == num_output_examples
 
-        self._index = end
-        return self._inputs[start:end], self._outputs[start:end]
+            if len(self._spkr2id) <= 1:
+                spkr_id = 0
+            else:
+                spkr = re.compile(self._spkr_pattern).search(
+                    filenames).group(1)
+                spkr_id = self._spkr2id[spkr]
+
+            if self._frame_by_frame:
+                spkr_ids = np.reshape([spkr_id] * num_input_examples, [-1, 1])
+            else:
+                spkr_ids = [spkr_id]
+
+            yield inputs, outputs, spkr_ids, num_input_examples
+
+    def __loop(self, sess):
+        halt = False
+        while not halt:
+            self._rng.shuffle(self._files)
+            for inputs, outputs, spkr_ids, num_examples in self.__load_data():
+                if self._coord.should_stop():
+                    halt = True
+                    break
+
+                sess.run(self._enqueue,
+                         feed_dict={self._input_placeholder: inputs,
+                                    self._output_placeholder: outputs,
+                                    self._spkr_ids_placeholder: spkr_ids})
+
+
+def load_binary_data(filename, num_dimensions=1, read_size=4):
+    data = []
+    with open(filename.rstrip(), 'rb') as f:
+        packed_data = f.read(read_size)
+        while packed_data != '':
+            data.extend(struct.unpack('f', packed_data))
+            packed_data = f.read(read_size)
+
+    return np.reshape(np.asarray(data), [-1, num_dimensions])
+
+
+def write_binary_data(filename, data, append=False):
+    mode = 'ab' if append else 'wb'
+    with open(filename, mode) as f:
+        for row in data:
+            for elem in row:
+                f.write(struct.pack('f', elem))
+
+
+def load_window(filename, padding=3):
+    with open(filename, 'r') as f:
+        lst = f.readline().rstrip().split(" ")
+        width = int(lst.pop(0))
+        window = [float(i) for i in lst]
+        for i in xrange((padding - width) // 2):
+            window.insert(0, 0.0)
+        for i in xrange((padding - width) // 2):
+            window.append(0.0)
+
+    return window
 
 
 def get_filenames(script_file):
@@ -116,145 +242,6 @@ def get_filenames(script_file):
     return input_filenames, output_filenames
 
 
-def read_data_from_queue(
-        script_file, num_dimensions, num_epochs, batch_size, seed,
-        min_after_dequeue, num_threads):
-    assert seed is not None
-
-    with tf.device('/cpu:0'):
-        if script_file is None or not os.path.isfile(script_file):
-            raise IOError('No such file %s' % script_file)
-
-        input_filenames, output_filenames = get_filenames(script_file)
-
-        input_filename_queue = tf.train.string_input_producer(
-            input_filenames, num_epochs=num_epochs,
-            shuffle=True, seed=seed, capacity=1000)
-        output_filename_queue = tf.train.string_input_producer(
-            output_filenames, num_epochs=num_epochs,
-            shuffle=True, seed=seed, capacity=1000)
-
-        def get_example(filename_queue, num_dimensions):
-            reader = tf.FixedLengthRecordReader(4 * num_dimensions)
-            _, value = reader.read(filename_queue)
-            return tf.decode_raw(value, tf.float32, little_endian=True)
-
-        num_input_dimensions, num_output_dimensions = num_dimensions
-        input_example = tf.slice(
-            get_example(input_filename_queue, num_input_dimensions),
-            [0], [num_input_dimensions])
-        output_example = tf.slice(
-            get_example(output_filename_queue, num_output_dimensions),
-            [0], [num_output_dimensions])
-
-        size = 0
-        for filename in input_filenames:
-            stat = os.stat(filename)
-            size = size + stat.st_size
-            num_examples = size // (4 * num_input_dimensions)
-
-        safety_margin = 1
-        capacity = (min_after_dequeue +
-                    (num_threads + safety_margin) * batch_size)
-
-        inputs, outputs = tf.train.shuffle_batch(
-            [input_example, output_example], batch_size, capacity,
-            min_after_dequeue, num_threads=num_threads, seed=seed,
-            allow_smaller_final_batch=False)
-
-    return [inputs, outputs], num_examples
-
-
-def read_data_from_script(
-        script_file, num_dimensions, shuffle=True, seed=None):
-    with tf.device('/cpu:0'):
-        if script_file is None or not os.path.isfile(script_file):
-            raise IOError('No such file %s' % script_file)
-
-        input_data = []
-        output_data = []
-        for filenames in open(script_file, 'r'):
-            input_filename, output_filename = filenames.split(' ', 1)
-            with open(input_filename.rstrip(), 'rb') as f:
-                packed_data = f.read(4)
-                while len(packed_data) != 0:
-                    input_data.extend(struct.unpack('f', packed_data))
-                    packed_data = f.read(4)
-            with open(output_filename.rstrip(), 'rb') as f:
-                packed_data = f.read(4)
-                while len(packed_data) != 0:
-                    output_data.extend(struct.unpack('f', packed_data))
-                    packed_data = f.read(4)
-
-        num_input_dimensions, num_output_dimensions = num_dimensions
-        inputs = numpy.reshape(input_data, [-1, num_input_dimensions])
-        outputs = numpy.reshape(output_data, [-1, num_output_dimensions])
-        assert len(inputs) == len(outputs)
-
-        num_examples = len(inputs)
-        if shuffle:
-            rng = numpy.random.RandomState(seed)
-            random_indices = numpy.arange(num_examples)
-            rng.shuffle(random_indices)
-            inputs = inputs[random_indices]
-            outputs = outputs[random_indices]
-
-    return InputOutputPairs(inputs, outputs, seed=seed), num_examples
-
-
-def read_data_from_file(filenames, num_dimensions):
-    input_filename, output_filename = filenames
-    num_input_dimensions, num_output_dimensions = num_dimensions
-
-    with tf.device('/cpu:0'):
-        inputs = read_data(input_filename, num_input_dimensions)
-        num_examples = len(inputs)
-
-        if output_filename is None:
-            outputs = numpy.zeros([num_examples, num_output_dimensions])
-        else:
-            outputs = read_data(output_filename, num_output_dimensions)
-
-    return InputOutputPairs(inputs, outputs), num_examples
-
-
-def batched_data(num_dimensions, batch_size):
-    num_input_dimensions, num_output_dimensions = num_dimensions
-
-    inputs = tf.placeholder(
-        tf.float32, shape=[batch_size, num_input_dimensions])
-    outputs = tf.placeholder(
-        tf.float32, shape=[batch_size, num_output_dimensions])
-
-    return inputs, outputs
-
-
-def read_data(filename, num_dimensions=None):
-    if filename is None or not os.path.isfile(filename):
-        raise IOError('No such file %s' % filename)
-
-    data = []
-    mode = 'rb'
-    with open(filename, mode) as f:
-        packed_data = f.read(4)
-        while len(packed_data) != 0:
-            data.extend(struct.unpack('f', packed_data))
-            packed_data = f.read(4)
-
-    if num_dimensions is not None:
-        data = numpy.reshape(data, [-1, num_dimensions])
-
-    return numpy.asarray(data, dtype=numpy.float32)
-
-
-def write_data(filename, data, append=False):
-    mode = 'ab' if append else 'wb'
-    with open(filename, mode) as f:
-        for row in data:
-            for elem in row:
-                f.write(struct.pack('f', elem))
-
-
 def load_config(config_file, verbose=True):
     config_parser = ConfigParser.SafeConfigParser()
     config_parser.read(config_file)
@@ -262,22 +249,7 @@ def load_config(config_file, verbose=True):
     config = {}
     for section in config_parser.sections():
         for option in config_parser.options(section):
-            config[option] = config_parser.get(section, option)
-
-            list_pattern = re.compile('^\[.+\]$')
-            if list_pattern.search(config[option]):
-                config[option] = json.loads(config[option])
-                continue
-
-            int_pattern = re.compile('^\d+$')
-            if int_pattern.search(config[option]):
-                config[option] = int(config[option])
-                continue
-
-            float_pattern = re.compile('^\d+\.\d+$')
-            if float_pattern.search(config[option]):
-                config[option] = float(config[option])
-                continue
+            config[option] = yaml.safe_load(config_parser.get(section, option))
 
     if verbose:
         print('Configuration Parameters[%d]' % len(config))
@@ -286,8 +258,7 @@ def load_config(config_file, verbose=True):
             print('              %-25s %20s' % (key, str(config[key])))
         print()
 
-    config['num_io_units'] = [
-        config['num_input_units'],
-        config['num_output_units']]
+    config['num_io_units'] = (config['num_input_units'],
+                              config['num_output_units'])
 
     return config

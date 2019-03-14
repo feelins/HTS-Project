@@ -361,7 +361,7 @@ stats:
 			LF0WINDIM=`expr $(NLF0WIN) \* $${LF0DIM}`; \
 			MGCWINLF0MSDDIM=`expr $${MGCWINDIM} + $${LF0MSDDIM}`; \
 			FFODIM=`expr $${MGCWINLF0MSDDIM} + $${LF0WINDIM}`; \
-			cat ffo/$(DATASET)_$(SPEAKER)_*.ffo | $(VSTAT) -l $${FFODIM} -d -o 2 > stats/ffo.var; \
+			cat ffo/*.ffo | $(VSTAT) -l $${FFODIM} -d -o 2 > stats/ffo.var; \
 			$(BCUT) +f -s 0                   -e `expr $${MGCWINDIM} - 1` -l 1 stats/ffo.var > stats/mgc.var; \
 			$(BCUT) +f -s $${MGCWINLF0MSDDIM}                             -l 1 stats/ffo.var > stats/lf0.var; \
 		else \
@@ -375,13 +375,13 @@ stats:
 			MGCWINLF0MSDDIM=`expr $${MGCWINDIM} + $${LF0MSDDIM}`; \
 			MGCWINLF0MSDLF0WINDIM=`expr $${MGCWINLF0MSDDIM} + $${LF0WINDIM}`; \
 			FFODIM=`expr $${MGCWINLF0MSDLF0WINDIM} + $${BAPWINDIM}`; \
-			cat ffo/$(DATASET)_$(SPEAKER)_*.ffo | $(VSTAT) -l $${FFODIM} -d -o 2 > stats/ffo.var; \
+			cat ffo/*.ffo | $(VSTAT) -l $${FFODIM} -d -o 2 > stats/ffo.var; \
 			$(BCUT) +f -s 0                         -e `expr $${MGCWINDIM} - 1`             -l 1 stats/ffo.var > stats/mgc.var; \
 			$(BCUT) +f -s $${MGCWINLF0MSDDIM}       -e `expr $${MGCWINLF0MSDLF0WINDIM} - 1` -l 1 stats/ffo.var > stats/lf0.var; \
 			$(BCUT) +f -s $${MGCWINLF0MSDLF0WINDIM}                                         -l 1 stats/ffo.var > stats/bap.var; \
 		fi; \
 		rm -f tmp.var1 tmp.var2; \
-		for ffo in ffo/$(DATASET)_$(SPEAKER)_*.ffo; do \
+		for ffo in ffo/*.ffo; do \
 			$(VSTAT) -l $${FFODIM} -d -o 2 $${ffo} >> tmp.var1; \
 		done; \
 		$(VSTAT) -l $${FFODIM} -d -o 2 tmp.var1 > tmp.var2; \
@@ -401,7 +401,7 @@ lab:
 	mkdir -p labels/mono
 	mkdir -p labels/full
 	if [ $(USEUTT) -eq 1 ]; then \
-		for utt in utts/$(DATASET)_$(SPEAKER)_*.utt; do \
+		for utt in utts/*.utt; do \
 			base=`basename $${utt} .utt`; \
 			if [ -s $${utt} ]; then \
 				echo "Extracting labels from $${utt}"; \
@@ -414,7 +414,7 @@ lab:
 			fi; \
 		done; \
 	else \
-		for txt in txt/$(DATASET)_$(SPEAKER)_*.txt; do \
+		for txt in txt/*.txt; do \
 			base=`basename $${txt} .txt`; \
 			if [ -s $${txt} ]; then \
 				echo "Extracting labels from $${txt}"; \

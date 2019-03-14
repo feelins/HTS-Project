@@ -220,17 +220,17 @@ cmp:
 					eval MGCWINS=\"$${MGCWINS} $(MGCWIN)$${i}\"; \
 					i=`expr $${i} + 1`; \
 				done; \
-				$(PERL) scripts/window.pl $${MGCDIM} mgc/$${base}.mgc $${MGCWINS} > tmp.mgc; \
+				$(PERL) scripts/window.pl $${MGCDIM} mgc/$${base}.mgc $${MGCWINS} > $${base}.mgc; \
 				LF0WINS=""; \
 				i=1; \
 				while [ $${i} -le $(NLF0WIN) ]; do \
 					eval LF0WINS=\"$${LF0WINS} $(LF0WIN)$${i}\"; \
 					i=`expr $${i} + 1`; \
 				done; \
-				$(PERL) scripts/window.pl $${LF0DIM} lf0/$${base}.lf0 $${LF0WINS} > tmp.lf0; \
-				$(MERGE) +f -s 0 -l $${LF0WINDIM} -L $${MGCWINDIM} tmp.mgc < tmp.lf0                 > tmp.cmp; \
-				$(PERL) scripts/addhtkheader.pl $(SAMPFREQ) $(FRAMESHIFT) $${BYTEPERFRAME} 9 tmp.cmp > cmp/$${base}.cmp; \
-				rm -f tmp.mgc tmp.lf0 tmp.cmp; \
+				$(PERL) scripts/window.pl $${LF0DIM} lf0/$${base}.lf0 $${LF0WINS} > $${base}.lf0; \
+				$(MERGE) +f -s 0 -l $${LF0WINDIM} -L $${MGCWINDIM} $${base}.mgc < $${base}.lf0            > $${base}.cmp; \
+				$(PERL) scripts/addhtkheader.pl $(SAMPFREQ) $(FRAMESHIFT) $${BYTEPERFRAME} 9 $${base}.cmp > cmp/$${base}.cmp; \
+				rm -f $${base}.mgc $${base}.lf0 $${base}.cmp; \
 			fi; \
 		else \
 			MGCDIM=`expr $(MGCORDER) + 1`; \
@@ -248,25 +248,25 @@ cmp:
 					eval MGCWINS=\"$${MGCWINS} $(MGCWIN)$${i}\"; \
 					i=`expr $${i} + 1`; \
 				done; \
-				$(PERL) scripts/window.pl $${MGCDIM} mgc/$${base}.mgc $${MGCWINS} > tmp.mgc; \
+				$(PERL) scripts/window.pl $${MGCDIM} mgc/$${base}.mgc $${MGCWINS} > $${base}.mgc; \
 				LF0WINS=""; \
 				i=1; \
 				while [ $${i} -le $(NLF0WIN) ]; do \
 					eval LF0WINS=\"$${LF0WINS} $(LF0WIN)$${i}\"; \
 					i=`expr $${i} + 1`; \
 				done; \
-				$(PERL) scripts/window.pl $${LF0DIM} lf0/$${base}.lf0 $${LF0WINS} > tmp.lf0; \
+				$(PERL) scripts/window.pl $${LF0DIM} lf0/$${base}.lf0 $${LF0WINS} > $${base}.lf0; \
 				BAPWINS=""; \
 				i=1; \
 				while [ $${i} -le $(NBAPWIN) ]; do \
 					eval BAPWINS=\"$${BAPWINS} $(BAPWIN)$${i}\"; \
 					i=`expr $${i} + 1`; \
 				done; \
-				$(PERL) scripts/window.pl $${BAPDIM} bap/$${base}.bap $${BAPWINS} > tmp.bap; \
-				$(MERGE) +f -s 0 -l $${LF0WINDIM} -L $${MGCWINDIM}    tmp.mgc     < tmp.lf0          > tmp.mgc+lf0; \
-				$(MERGE) +f -s 0 -l $${BAPWINDIM} -L $${MGCLF0WINDIM} tmp.mgc+lf0 < tmp.bap          > tmp.cmp; \
-				$(PERL) scripts/addhtkheader.pl $(SAMPFREQ) $(FRAMESHIFT) $${BYTEPERFRAME} 9 tmp.cmp > cmp/$${base}.cmp; \
-				rm -f tmp.mgc tmp.lf0 tmp.bap tmp.mgc+lf0 tmp.cmp; \
+				$(PERL) scripts/window.pl $${BAPDIM} bap/$${base}.bap $${BAPWINS} > $${base}.bap; \
+				$(MERGE) +f -s 0 -l $${LF0WINDIM} -L $${MGCWINDIM}    $${base}.mgc     < $${base}.lf0     > $${base}.mgc+lf0; \
+				$(MERGE) +f -s 0 -l $${BAPWINDIM} -L $${MGCLF0WINDIM} $${base}.mgc+lf0 < $${base}.bap     > $${base}.cmp; \
+				$(PERL) scripts/addhtkheader.pl $(SAMPFREQ) $(FRAMESHIFT) $${BYTEPERFRAME} 9 $${base}.cmp > cmp/$${base}.cmp; \
+				rm -f $${base}.mgc $${base}.lf0 $${base}.bap $${base}.mgc+lf0 $${base}.cmp; \
 			fi; \
 		fi; \
 	done
@@ -280,11 +280,11 @@ ffo:
 			echo "Making frame-by-frame DNN outputs for $${base}"; \
 			if [ $(USESTRAIGHT) -eq 0 ]; then \
 				MGCDIM=`expr $(MGCORDER) + 1`; \
-				VUVDIM=1; \
 				LF0DIM=1; \
 				MGCWINDIM=`expr $(NMGCWIN) \* $${MGCDIM}`; \
+				LF0MSDDIM=1; \
 				LF0WINDIM=`expr $(NLF0WIN) \* $${LF0DIM}`; \
-				MGCWINVUVDIM=`expr $${MGCWINDIM} + $${VUVDIM}`; \
+				MGCWINLF0MSDDIM=`expr $${MGCWINDIM} + $${LF0MSDDIM}`; \
 				if [ -s mgc/$${base}.mgc -a -s lf0/$${base}.lf0 ]; then \
 					MGCWINS=""; \
 					i=1; \
@@ -292,30 +292,30 @@ ffo:
 						eval MGCWINS=\"$${MGCWINS} $(MGCWIN)$${i}\"; \
 						i=`expr $${i} + 1`; \
 					done; \
-					$(PERL) scripts/window.pl $${MGCDIM} mgc/$${base}.mgc $${MGCWINS} > tmp.mgc; \
-					$(SOPR) lf0/$${base}.lf0 -magic -1.0E+10 -m 0.0 -a 1.0 -MAGIC 0.0 > tmp.vuv; \
+					$(PERL) scripts/window.pl $${MGCDIM} mgc/$${base}.mgc $${MGCWINS} > $${base}.mgc; \
+					$(SOPR) lf0/$${base}.lf0 -magic -1.0E+10 -m 0.0 -a 1.0 -MAGIC 0.0 > $${base}.lf0.msd; \
 					LF0WINS=""; \
 					i=1; \
 					while [ $${i} -le $(NLF0WIN) ]; do \
 						eval LF0WINS=\"$${LF0WINS} $(LF0WIN)$${i}\"; \
 						i=`expr $${i} + 1`; \
 					done; \
-					$(PERL) scripts/interpolate.pl $${LF0DIM} lf0/$${base}.lf0  > tmp.ip.lf0; \
-					$(PERL) scripts/window.pl $${LF0DIM} tmp.ip.lf0 $${LF0WINS} > tmp.lf0; \
-					$(MERGE) +f -s 0 -l $${VUVDIM}    -L $${MGCWINDIM}    tmp.mgc     < tmp.vuv > tmp.mgc+vuv; \
-					$(MERGE) +f -s 0 -l $${LF0WINDIM} -L $${MGCWINVUVDIM} tmp.mgc+vuv < tmp.lf0 > ffo/$${base}.ffo; \
-					rm -f tmp.mgc tmp.vuv tmp.lf0 tmp.ip.lf0 tmp.mgc+vuv; \
+					$(PERL) scripts/interpolate.pl $${LF0DIM} lf0/$${base}.lf0 > $${base}.lf0.ip; \
+					$(PERL) scripts/window.pl $${LF0DIM} $${base}.lf0.ip $${LF0WINS} > $${base}.lf0; \
+					$(MERGE) +f -s 0 -l $${LF0MSDDIM} -L $${MGCWINDIM}       $${base}.mgc         < $${base}.lf0.msd > $${base}.mgc+lf0.msd; \
+					$(MERGE) +f -s 0 -l $${LF0WINDIM} -L $${MGCWINLF0MSDDIM} $${base}.mgc+lf0.msd < $${base}.lf0     > ffo/$${base}.ffo; \
+					rm -f $${base}.mgc $${base}.lf0.msd $${base}.lf0 $${base}.lf0.ip $${base}.mgc+lf0.msd; \
 				fi; \
 			else \
 				MGCDIM=`expr $(MGCORDER) + 1`; \
-				VUVDIM=1; \
 				LF0DIM=1; \
 				BAPDIM=`expr $(BAPORDER) + 1`; \
 				MGCWINDIM=`expr $(NMGCWIN) \* $${MGCDIM}`; \
+				LF0MSDDIM=1; \
 				LF0WINDIM=`expr $(NLF0WIN) \* $${LF0DIM}`; \
 				BAPWINDIM=`expr $(NBAPWIN) \* $${BAPDIM}`; \
-				MGCWINVUVDIM=`expr $${MGCWINDIM} + $${VUVDIM}`; \
-				MGCWINVUVLF0WINDIM=`expr $${MGCWINVUVDIM} + $${LF0WINDIM}`; \
+				MGCWINLF0MSDDIM=`expr $${MGCWINDIM} + $${LF0MSDDIM}`; \
+				MGCWINLF0MSDLF0WINDIM=`expr $${MGCWINLF0MSDDIM} + $${LF0WINDIM}`; \
 				if [ -s mgc/$${base}.mgc -a -s lf0/$${base}.lf0 -a -s bap/$${base}.bap ]; then \
 					MGCWINS=""; \
 					i=1; \
@@ -323,27 +323,27 @@ ffo:
 						eval MGCWINS=\"$${MGCWINS} $(MGCWIN)$${i}\"; \
 						i=`expr $${i} + 1`; \
 					done; \
-					$(PERL) scripts/window.pl $${MGCDIM} mgc/$${base}.mgc $${MGCWINS} > tmp.mgc; \
-					$(SOPR) lf0/$${base}.lf0 -magic -1.0E+10 -m 0.0 -a 1.0 -MAGIC 0.0 > tmp.vuv; \
+					$(PERL) scripts/window.pl $${MGCDIM} mgc/$${base}.mgc $${MGCWINS} > $${base}.mgc; \
+					$(SOPR) lf0/$${base}.lf0 -magic -1.0E+10 -m 0.0 -a 1.0 -MAGIC 0.0 > $${base}.lf0.msd; \
 					LF0WINS=""; \
 					i=1; \
 					while [ $${i} -le $(NLF0WIN) ]; do \
 						eval LF0WINS=\"$${LF0WINS} $(LF0WIN)$${i}\"; \
 						i=`expr $${i} + 1`; \
 					done; \
-					$(PERL) scripts/interpolate.pl $${LF0DIM} lf0/$${base}.lf0  > tmp.ip.lf0; \
-					$(PERL) scripts/window.pl $${LF0DIM} tmp.ip.lf0 $${LF0WINS} > tmp.lf0; \
+					$(PERL) scripts/interpolate.pl $${LF0DIM} lf0/$${base}.lf0 > $${base}.lf0.ip; \
+					$(PERL) scripts/window.pl $${LF0DIM} $${base}.lf0.ip $${LF0WINS} > $${base}.lf0; \
 					BAPWINS=""; \
 					i=1; \
 					while [ $${i} -le $(NBAPWIN) ]; do \
 						eval BAPWINS=\"$${BAPWINS} $(BAPWIN)$${i}\"; \
 						i=`expr $${i} + 1`; \
 					done; \
-					$(PERL) scripts/window.pl $${BAPDIM} bap/$${base}.bap $${BAPWINS} > tmp.bap; \
-					$(MERGE) +f -s 0 -l $${VUVDIM}    -L $${MGCWINDIM}          tmp.mgc         < tmp.vuv > tmp.mgc+vuv; \
-					$(MERGE) +f -s 0 -l $${LF0WINDIM} -L $${MGCWINVUVDIM}       tmp.mgc+vuv     < tmp.lf0 > tmp.mgc+vuv+lf0; \
-					$(MERGE) +f -s 0 -l $${BAPWINDIM} -L $${MGCWINVUVLF0WINDIM} tmp.mgc+vuv+lf0 < tmp.bap > ffo/$${base}.ffo; \
-					rm -f tmp.mgc tmp.vuv tmp.lf0 tmp.ip.lf0 tmp.bap tmp.mgc+vuv tmp.mgc+vuv+lf0; \
+					$(PERL) scripts/window.pl $${BAPDIM} bap/$${base}.bap $${BAPWINS} > $${base}.bap; \
+					$(MERGE) +f -s 0 -l $${LF0MSDDIM} -L $${MGCWINDIM}             $${base}.mgc             < $${base}.lf0.msd > $${base}.mgc+lf0.msd; \
+					$(MERGE) +f -s 0 -l $${LF0WINDIM} -L $${MGCWINLF0MSDDIM}       $${base}.mgc+lf0.msd     < $${base}.lf0     > $${base}.mgc+lf0.msd+lf0; \
+					$(MERGE) +f -s 0 -l $${BAPWINDIM} -L $${MGCWINLF0MSDLF0WINDIM} $${base}.mgc+lf0.msd+lf0 < $${base}.bap     > ffo/$${base}.ffo; \
+					rm -f $${base}.mgc $${base}.lf0.msd $${base}.lf0 $${base}.lf0.ip $${base}.bap $${base}.mgc+lf0.msd $${base}.mgc+lf0.msd+lf0; \
 				fi; \
 			fi; \
 		done; \
@@ -355,31 +355,45 @@ stats:
 		mkdir -p stats; \
 		if [ $(USESTRAIGHT) -eq 0 ]; then \
 			MGCDIM=`expr $(MGCORDER) + 1`; \
-			VUVDIM=1; \
 			LF0DIM=1; \
 			MGCWINDIM=`expr $(NMGCWIN) \* $${MGCDIM}`; \
+			LF0MSDDIM=1; \
 			LF0WINDIM=`expr $(NLF0WIN) \* $${LF0DIM}`; \
-			MGCWINVUVDIM=`expr $${MGCWINDIM} + $${VUVDIM}`; \
-			FFODIM=`expr $${MGCWINVUVDIM} + $${LF0WINDIM}`; \
-			cat ffo/*.ffo | $(VSTAT) -l $${FFODIM} -d -o 2 > stats/ffo.var; \
-			$(BCUT) +f -s 0                -e `expr $${MGCWINDIM} - 1` -l 1 stats/ffo.var > stats/mgc.var; \
-			$(BCUT) +f -s $${MGCWINVUVDIM} -e -1                       -l 1 stats/ffo.var > stats/lf0.var; \
+			MGCWINLF0MSDDIM=`expr $${MGCWINDIM} + $${LF0MSDDIM}`; \
+			FFODIM=`expr $${MGCWINLF0MSDDIM} + $${LF0WINDIM}`; \
+			cat ffo/$(DATASET)_$(SPEAKER)_*.ffo | $(VSTAT) -l $${FFODIM} -d -o 2 > stats/ffo.var; \
+			$(BCUT) +f -s 0                   -e `expr $${MGCWINDIM} - 1` -l 1 stats/ffo.var > stats/mgc.var; \
+			$(BCUT) +f -s $${MGCWINLF0MSDDIM}                             -l 1 stats/ffo.var > stats/lf0.var; \
 		else \
 			MGCDIM=`expr $(MGCORDER) + 1`; \
-			VUVDIM=1; \
 			LF0DIM=1; \
 			BAPDIM=`expr $(BAPORDER) + 1`; \
 			MGCWINDIM=`expr $(NMGCWIN) \* $${MGCDIM}`; \
+			LF0MSDDIM=1; \
 			LF0WINDIM=`expr $(NLF0WIN) \* $${LF0DIM}`; \
 			BAPWINDIM=`expr $(NBAPWIN) \* $${BAPDIM}`; \
-			MGCWINVUVDIM=`expr $${MGCWINDIM} + $${VUVDIM}`; \
-			MGCWINVUVLF0WINDIM=`expr $${MGCWINVUVDIM} + $${LF0WINDIM}`; \
-			FFODIM=`expr $${MGCWINVUVLF0WINDIM} + $${BAPWINDIM}`; \
-			cat ffo/*.ffo | $(VSTAT) -l $${FFODIM} -d -o 2 > stats/ffo.var; \
-			$(BCUT) +f -s 0                      -e `expr $${MGCWINDIM} - 1`          -l 1 stats/ffo.var > stats/mgc.var; \
-			$(BCUT) +f -s $${MGCWINVUVDIM}       -e `expr $${MGCWINVUVLF0WINDIM} - 1` -l 1 stats/ffo.var > stats/lf0.var; \
-			$(BCUT) +f -s $${MGCWINVUVLF0WINDIM} -e -1                                -l 1 stats/ffo.var > stats/bap.var; \
+			MGCWINLF0MSDDIM=`expr $${MGCWINDIM} + $${LF0MSDDIM}`; \
+			MGCWINLF0MSDLF0WINDIM=`expr $${MGCWINLF0MSDDIM} + $${LF0WINDIM}`; \
+			FFODIM=`expr $${MGCWINLF0MSDLF0WINDIM} + $${BAPWINDIM}`; \
+			cat ffo/$(DATASET)_$(SPEAKER)_*.ffo | $(VSTAT) -l $${FFODIM} -d -o 2 > stats/ffo.var; \
+			$(BCUT) +f -s 0                         -e `expr $${MGCWINDIM} - 1`             -l 1 stats/ffo.var > stats/mgc.var; \
+			$(BCUT) +f -s $${MGCWINLF0MSDDIM}       -e `expr $${MGCWINLF0MSDLF0WINDIM} - 1` -l 1 stats/ffo.var > stats/lf0.var; \
+			$(BCUT) +f -s $${MGCWINLF0MSDLF0WINDIM}                                         -l 1 stats/ffo.var > stats/bap.var; \
 		fi; \
+		rm -f tmp.var1 tmp.var2; \
+		for ffo in ffo/$(DATASET)_$(SPEAKER)_*.ffo; do \
+			$(VSTAT) -l $${FFODIM} -d -o 2 $${ffo} >> tmp.var1; \
+		done; \
+		$(VSTAT) -l $${FFODIM} -d -o 2 tmp.var1 > tmp.var2; \
+		if [ $(USESTRAIGHT) -eq 0 ]; then \
+			$(BCUT) -s 0                   -e `expr $${MGCDIM} - 1`                       tmp.var2 >  stats/gv.var; \
+			$(BCUT) -s $${MGCWINLF0MSDDIM} -e `expr $${MGCWINLF0MSDDIM} + $${LF0DIM} - 1` tmp.var2 >> stats/gv.var; \
+		else \
+			$(BCUT) -s 0                         -e `expr $${MGCDIM} - 1`                             tmp.var2 >  stats/gv.var; \
+			$(BCUT) -s $${MGCWINLF0MSDDIM}       -e `expr $${MGCWINLF0MSDDIM} + $${LF0DIM} - 1`       tmp.var2 >> stats/gv.var; \
+			$(BCUT) -s $${MGCWINLF0MSDLF0WINDIM} -e `expr $${MGCWINLF0MSDLF0WINDIM} + $${BAPDIM} - 1` tmp.var2 >> stats/gv.var; \
+		fi; \
+		rm -f tmp.var1 tmp.var2; \
 	fi
 
 lab:
@@ -391,12 +405,12 @@ lab:
 			base=`basename $${utt} .utt`; \
 			if [ -s $${utt} ]; then \
 				echo "Extracting labels from $${utt}"; \
-				$(DUMPFEATS) -eval scripts/extra_feats.scm -relation Segment -feats scripts/label.feats -output tmp.feats $${utt}; \
+				$(DUMPFEATS) -eval scripts/extra_feats.scm -relation Segment -feats scripts/label.feats -output $${base}.feats $${utt}; \
 			fi; \
-			if [ -s tmp.feats ]; then \
-				$(AWK) -f scripts/label-full.awk tmp.feats > labels/full/$${base}.lab; \
-				$(AWK) -f scripts/label-mono.awk tmp.feats > labels/mono/$${base}.lab; \
-				rm -f tmp.feats; \
+			if [ -s $${base}.feats ]; then \
+				$(AWK) -f scripts/label-full.awk $${base}.feats > labels/full/$${base}.lab; \
+				$(AWK) -f scripts/label-mono.awk $${base}.feats > labels/mono/$${base}.lab; \
+				rm -f $${base}.feats; \
 			fi; \
 		done; \
 	else \
@@ -404,15 +418,15 @@ lab:
 			base=`basename $${txt} .txt`; \
 			if [ -s $${txt} ]; then \
 				echo "Extracting labels from $${txt}"; \
-				$(PERL) scripts/normtext.pl $${txt} > tmp.txt; \
-				$(TEXT2UTT) tmp.txt > tmp.utt; \
-				$(DUMPFEATS) -eval scripts/extra_feats.scm -relation Segment -feats scripts/label.feats -output tmp.feats tmp.utt; \
-				rm -f tmp.txt tmp.utt; \
+				$(PERL) scripts/normtext.pl $${txt} > $${base}.txt; \
+				$(TEXT2UTT) $${base}.txt > $${base}.utt; \
+				$(DUMPFEATS) -eval scripts/extra_feats.scm -relation Segment -feats scripts/label.feats -output $${base}.feats $${base}.utt; \
+				rm -f $${base}.txt $${base}.utt; \
 			fi; \
-			if [ -s tmp.feats ]; then \
-				$(AWK) -f scripts/label-full.awk tmp.feats > labels/full/$${base}.lab; \
-				$(AWK) -f scripts/label-mono.awk tmp.feats > labels/mono/$${base}.lab; \
-				rm -f tmp.feats; \
+			if [ -s $${base}.feats ]; then \
+				$(AWK) -f scripts/label-full.awk $${base}.feats > labels/full/$${base}.lab; \
+				$(AWK) -f scripts/label-mono.awk $${base}.feats > labels/mono/$${base}.lab; \
+				rm -f $${base}.feats; \
 			fi; \
 		done; \
 	fi
@@ -478,7 +492,7 @@ question:
 	# Generating a question file
 	mkdir -p questions
 	$(PERL) scripts/makequestion.pl configs/$(QNAME).conf > questions/questions_$(QNAME).hed
-	grep Utterance questions/questions_$(QNAME).hed > questions/questions_utt_$(QNAME).hed
+	grep -e 'Num.*Utterance' questions/questions_$(QNAME).hed > questions/questions_utt_$(QNAME).hed
 
 clean: clean-mgc clean-lf0 clean-bap clean-cmp clean-ffo clean-stats clean-lab clean-mlf clean-list clean-scp clean-question
 

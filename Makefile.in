@@ -4,7 +4,7 @@
 #           http://hts.sp.nitech.ac.jp/                             #
 # ----------------------------------------------------------------- #
 #                                                                   #
-#  Copyright (c) 2001-2016  Nagoya Institute of Technology          #
+#  Copyright (c) 2001-2017  Nagoya Institute of Technology          #
 #                           Department of Computer Science          #
 #                                                                   #
 #                2001-2008  Tokyo Institute of Technology           #
@@ -45,7 +45,7 @@
 all: data voice
 
 data:
-	@ (cd data ; $(MAKE) all -f Makefile)
+	@ (cd data ; $(MAKE) all)
 
 voice:
 	#echo "Running a training/synthesis perl script (Training.pl) in background...."
@@ -54,13 +54,13 @@ voice:
 clean: clean-data clean-voice
 
 clean-data:
-	@ (cd data ; $(MAKE) clean -f Makefile)
+	@ (cd data ; $(MAKE) clean)
 
 clean-voice:
 	rm -rf models stats edfiles trees gv mspf dnn voices gen proto configs
 
 distclean: clean
-	@ (cd data ; $(MAKE) distclean -f Makefile)
+	@ (cd data ; $(MAKE) distclean)
 	rm -f Makefile
 	rm -f scripts/Config.pm
 	rm -f config.log

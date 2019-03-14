@@ -1,6 +1,6 @@
 # Process this file with autoconf to produce a configure script.
-AC_INIT(HTS-demo_CMU-ARCTIC-SLT, 2.3, hts-users@sp.nitech.ac.jp)
-AC_COPYRIGHT(Copyright 2001-2016 Nagoya Institute of Technology)
+AC_INIT(HTS-demo_CMU-ARCTIC-SLT, 2.3.2, hts-users@sp.nitech.ac.jp)
+AC_COPYRIGHT(Copyright 2001-2017 Nagoya Institute of Technology)
 AC_COPYRIGHT(Copyright 2001-2008 Tokyo Institute of Technology)
 
 
@@ -272,6 +272,12 @@ if test ! -f "$MLPG"; then
 	AC_MSG_ERROR(Can't find mlpg of SPTK)
 fi
 
+# interpolate
+AC_PATH_PROG([INTERPOLATE], [interpolate], [:], [${sptk_search_path}:$PATH])
+if test ! -f "$INTERPOLATE"; then
+	AC_MSG_ERROR(Can't find interpolate of SPTK)
+fi
+
 
 
 # MATLAB
@@ -469,8 +475,8 @@ AC_ARG_VAR([FRAMELEN],[frame length in point (default=1200)])
 AC_ARG_VAR([FRAMESHIFT],[frame shift in point (default=240)])
 AC_ARG_VAR([WINDOWTYPE],[window type -> 0: Blackman  1: Hamming  2: Hanning (default=1)])
 AC_ARG_VAR([NORMALIZE],[normalization -> 0: none  1: by power  2: by magnitude (default=1)])
-AC_ARG_VAR([FFTLEN],[FFT length in point (default=2048)])
 AC_ARG_VAR([SAMPFREQ],[sampling frequency in Hz (default=48000)])
+AC_ARG_VAR([FFTLEN],[FFT length in point (default=2048)])
 AC_ARG_VAR([FREQWARP],[frequency warping factor (default=0.55)])
 AC_ARG_VAR([GAMMA],[pole/zero weight factor (0: mel-cepstral analysis  1: LPC analysis  2,3,...,N: mel-generalized cepstral (MGC) analysis) (default=0)])
 AC_ARG_VAR([MGCORDER],[order of MGC analysis (default=34 for cepstral form, default=12 for LSP form)])
@@ -550,7 +556,7 @@ if test -z "$MGCORDER"; then
 	if test $GAMMA -eq 0; then
 		MGCORDER=34
 	else
-			MGCORDER=12
+		MGCORDER=12
 	fi
 fi
 
@@ -732,7 +738,7 @@ if test -z "$LF0BANDWIDTH"; then
 fi
 
 if test -z "$BAPBANDWIDTH"; then
-	BAPBANDWIDTH=25
+	BAPBANDWIDTH=$BAPVSIZE
 fi
 
 # substitute variables
@@ -757,7 +763,7 @@ AC_SUBST(BAPBANDWIDTH)
 AC_ARG_VAR([PGTYPE],[type of speech parameter generation algorithm (0: Cholesky, 1: MixHidden, 2: StateHidden, default=0)])
 AC_ARG_VAR([MAXEMITER],[max EM iteration (default=20)])
 AC_ARG_VAR([EMEPSILON],[convergence factor for EM iteration (default=0.0001)])
-AC_ARG_VAR([USEGV],[turn on GV-based parameter generation algorithm (0:off or 1:on, default=1)])
+AC_ARG_VAR([USEHMMGV],[turn on GV-based parameter generation algorithm (0:off or 1:on, default=1)])
 AC_ARG_VAR([MAXGVITER],[maximum number of iterations of GV-based parameter generation algorithm (default=50)])
 AC_ARG_VAR([GVEPSILON],[convergence factor for GV iteration (default=0.0001)])
 AC_ARG_VAR([MINEUCNORM],[minimum Euclid norm for GV iteration (default=0.01)])
@@ -784,8 +790,8 @@ if test -z "$EMEPSILON"; then
 	EMEPSILON=0.0001
 fi
 
-if test -z "$USEGV"; then
-	USEGV=1
+if test -z "$USEHMMGV"; then
+	USEHMMGV=1
 fi
 
 if test -z "$MAXGVITER"; then
@@ -840,7 +846,7 @@ fi
 AC_SUBST(PGTYPE)
 AC_SUBST(MAXEMITER)
 AC_SUBST(EMEPSILON)
-AC_SUBST(USEGV)
+AC_SUBST(USEHMMGV)
 AC_SUBST(MAXGVITER)
 AC_SUBST(GVEPSILON)
 AC_SUBST(MINEUCNORM)
@@ -858,17 +864,18 @@ AC_SUBST(USEMSPF)
 # neural network training settings
 # parse command-line arguments
 AC_ARG_VAR([USEDNN],[use deep neural network as acoustic model (0:off or 1:on, default=0)])
-AC_ARG_VAR([NHIDDENUNITS],[number of hidden units in each layer (1st 2nd 3rd ...) (default='1024 1024 1024')])
+AC_ARG_VAR([NHIDDENUNITS],[number of hidden units in each layer (1st 2nd 3rd ...) (default='2048 2048 2048')])
 AC_ARG_VAR([ACTIVATION],[activation function for hidden units -> 0: Linear  1: Sigmoid  2: Tanh  3: ReLU (default=1)])
 AC_ARG_VAR([OPTIMIZER],[optimizer -> 0: SGD  1: Momentum  2: AdaGrad  3: AdaDelta  4: Adam  5: RMSprop (default=4)])
 AC_ARG_VAR([LEARNRATE],[learning rate (default=0.001)])
+AC_ARG_VAR([TRJLEARNRATE],[learning rate for trajectory training (default=0.0001)])
+AC_ARG_VAR([DNNGVWEIGHT],[weight for GV (default=0.1)])
 AC_ARG_VAR([KEEPPROB],[probability for not randomly setting activities to zero (default=0.5)])
-AC_ARG_VAR([USEQUEUE],[use queue to load training data (0:off or 1:on, default=0)])
-AC_ARG_VAR([QUEUESIZE],[queue size (default=5000)])
+AC_ARG_VAR([QUEUESIZE],[queue size (default=10000)])
 AC_ARG_VAR([BATCHSIZE],[mini-batch size (default=256)])
-AC_ARG_VAR([NEPOCH],[number of epochs (default=50)])
+AC_ARG_VAR([NEPOCH],[number of epochs (default=100)])
+AC_ARG_VAR([NTRJEPOCH],[number of epochs for trajectory training (default=50)])
 AC_ARG_VAR([NTHREAD],[number of threads (0:unlimited, default=0)])
-AC_ARG_VAR([RESTORECKPT],[checkpoint for parameter generation (default=130000)])
 AC_ARG_VAR([RANDOMSEED],[random seed for initialization (default=12345)])
 
 # default values
@@ -881,7 +888,7 @@ elif test $USEDNN -eq 1; then
 fi
 
 if test -z "$NHIDDENUNITS"; then
-	NHIDDENUNITS='1024 1024 1024'
+	NHIDDENUNITS='2048 2048 2048'
 fi
 
 if test -z "$ACTIVATION"; then
@@ -896,16 +903,20 @@ if test -z "$LEARNRATE"; then
 	LEARNRATE=0.001
 fi
 
+if test -z "$TRJLEARNRATE"; then
+	TRJLEARNRATE=0.0001
+fi
+
+if test -z "$DNNGVWEIGHT"; then
+	DNNGVWEIGHT=0.1
+fi
+
 if test -z "$KEEPPROB"; then
 	KEEPPROB=0.5
 fi
 
-if test -z "$USEQUEUE"; then
-	USEQUEUE=0
-fi
-
 if test -z "$QUEUESIZE"; then
-	QUEUESIZE=5000
+	QUEUESIZE=10000
 fi
 
 if test -z "$BATCHSIZE"; then
@@ -913,15 +924,15 @@ if test -z "$BATCHSIZE"; then
 fi
 
 if test -z "$NEPOCH"; then
-	NEPOCH=50
+	NEPOCH=100
+fi
+
+if test -z "$NTRJEPOCH"; then
+	NTRJEPOCH=50
 fi
 
 if test -z "$NTHREAD"; then
 	NTHREAD=0
-fi
-
-if test -z "$RESTORECKPT"; then
-	RESTORECKPT=130000
 fi
 
 if test -z "$RANDOMSEED"; then
@@ -934,15 +945,16 @@ AC_SUBST(NHIDDENUNITS)
 AC_SUBST(ACTIVATION)
 AC_SUBST(OPTIMIZER)
 AC_SUBST(LEARNRATE)
+AC_SUBST(TRJLEARNRATE)
+AC_SUBST(DNNGVWEIGHT)
 AC_SUBST(KEEPPROB)
-AC_SUBST(USEQUEUE)
 AC_SUBST(QUEUESIZE)
 AC_SUBST(BATCHSIZE)
 AC_SUBST(NEPOCH)
+AC_SUBST(NTRJEPOCH)
 AC_SUBST(NTHREAD)
-AC_SUBST(RESTORECKPT)
 AC_SUBST(RANDOMSEED)
 
 
-# output Makefiles and config files
+# output Makefiles and config file
 AC_OUTPUT(data/Makefile Makefile scripts/Config.pm)

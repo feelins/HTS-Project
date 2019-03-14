@@ -1491,8 +1491,8 @@ sub make_data_gv {
                   if ( $arr[2] eq "$slnt[$j]" ) { $find = 1; last; }
                }
                if ( $find == 0 ) {
-                  $start = int( $arr[0] * ( 1.0e-7 / ( $fs / $sr ) ) );
-                  $end   = int( $arr[1] * ( 1.0e-7 / ( $fs / $sr ) ) );
+                  $start = int( $arr[0] * ( 1.0E-07 / ( $fs / $sr ) ) );
+                  $end   = int( $arr[1] * ( 1.0E-07 / ( $fs / $sr ) ) );
                   shell("$BCUT -s $start -e $end -l $ordr{$type} < $datdir/$type/$base.$type >> $gvdatdir/tmp.$type");
                }
             }
@@ -1698,7 +1698,7 @@ sub convert_dur2lab($) {
    my ($gendir) = @_;
    my ( $line, @FILE, $file, $base, $s, $e, $model, $ct, $t, $p, @ary );
 
-   $p    = int( 10E+6 * $fs / $sr );
+   $p    = int( 1.0E+07 * $fs / $sr );
    @FILE = glob "$gendir/*.dur";
    foreach $file (@FILE) {
       $base = `basename $file .dur`;
@@ -1742,14 +1742,14 @@ sub make_train_data_dnn {
       $base = `basename $lab .lab`;
       chomp($base);
       print " Making data from $lab for neural network training...";
-      $line = "$PERL $datdir/scripts/makefeature.pl $qconf " . int( 10E+6 * $fs / $sr ) . " $lab | ";
+      $line = "$PERL $datdir/scripts/makefeature.pl $qconf " . int( 1.0E+07 * $fs / $sr ) . " $lab | ";
       $line .= "$X2X +af > $dnnffidir{'ful'}/$base.ffi";
       shell($line);
       print "done\n";
    }
 
    # make scp
-   open( SCP, ">$scp{'fio'}" ) || die "Cannot open $!";
+   open( SCP, ">$scp{'tdn'}" ) || die "Cannot open $!";
    foreach $ffi ( glob "$dnnffidir{'ful'}/*.ffi" ) {
       $base = `basename $ffi .ffi`;
       chomp($base);
@@ -1770,14 +1770,14 @@ sub make_gen_data_dnn($) {
       $base = `basename $lab .lab`;
       chomp($base);
       print " Making data from $lab for neural network running...";
-      $line = "$PERL $datdir/scripts/makefeature.pl $qconf " . int( 10E+6 * $fs / $sr ) . " $lab 2> /dev/null | ";
+      $line = "$PERL $datdir/scripts/makefeature.pl $qconf " . int( 1.0E+07 * $fs / $sr ) . " $lab 2> /dev/null | ";
       $line .= "$X2X +af > $dnnffidir{'gen'}/$base.ffi";
       shell($line);
       print "done\n";
    }
 
    # make scp
-   open( SCP, ">$scp{'ffi'}" ) || die "Cannot open $!";
+   open( SCP, ">$scp{'sdn'}" ) || die "Cannot open $!";
    print SCP "$_\n" for glob "$dnnffidir{'gen'}/*.ffi";
    close(SCP);
 }
@@ -1917,9 +1917,9 @@ sub make_config {
 
    # config file for parameter generation
    open( CONF, ">$cfg{'syn'}" ) || die "Cannot open $!";
-   print CONF "NATURALREADORDER  = T\n";
+   print CONF "NATURALREADORDER = T\n";
    print CONF "NATURALWRITEORDER = T\n";
-   print CONF "USEALIGN    = T\n";
+   print CONF "USEALIGN = T\n";
    print CONF "HGEN: TRACE = 1\n";
 
    print CONF "PDFSTRSIZE  = \"IntVec $nPdfStreams{'cmp'}";    # PdfStream structure
@@ -1949,7 +1949,7 @@ sub make_config {
 
    print CONF "MAXEMITER  = $maxEMiter\n";
    print CONF "EMEPSILON  = $EMepsilon\n";
-   print CONF "USEGV      = $boolstring[$useGV]\n";
+   print CONF "USEGV      = $boolstring[$useHmmGV]\n";
    print CONF "GVMODELMMF = $clsammf{'gv'}\n";
    print CONF "GVHMMLIST  = $tiedlst{'gv'}\n";
    print CONF "MAXGVITER  = $maxGViter\n";
@@ -1981,38 +1981,117 @@ sub make_config {
 }
 
 # sub routine for generating config file for DNN
-sub make_dnn_config {
+sub make_config_dnn {
    my ( $nin, $nhid, $nout );
    my @activations = qw(Linear Sigmoid Tanh ReLU);
    my @optimizers  = qw(SGD Momentum AdaGrad AdaDelta Adam RMSprop);
 
-   $nin = `grep -c -v -e '^\$' -e '^ *#' $qconf`;
+   $nin = `$PERL $datdir/scripts/makefeature.pl $qconf`;
    chomp $nin;
    $nhid = join ", ", ( split /\s+/, $nHiddenUnits );
-   $nout = $vSize{'cmp'}{'total'} + 1;
+   $nout = 0;
+   foreach $type (@cmp) {
+      if ( $msdi{$type} != 0 ) {
+         $nout += 1;
+      }
+      $nout += $vSize{'cmp'}{$type};
+   }
 
    open( CONF, ">$cfg{'tdn'}" ) || die "Cannot open $!";
    print CONF "[Architecture]\n";
    print CONF "num_input_units: $nin\n";
    print CONF "num_hidden_units: [$nhid]\n";
    print CONF "num_output_units: $nout\n";
-   print CONF "hidden_activation: $activations[$activation]\n";
-   print CONF "output_activation: $activations[0]\n";
+   print CONF "hidden_activation: \"$activations[$activation]\"\n";
+   print CONF "output_activation: \"$activations[0]\"\n";
    print CONF "\n[Strategy]\n";
-   print CONF "optimizer: $optimizers[$optimizer]\n";
+   print CONF "optimizer: \"$optimizers[$optimizer]\"\n";
    print CONF "learning_rate: $learnRate\n";
    print CONF "keep_prob: $keepProb\n";
-   print CONF "use_queue: $useQueue\n";
    print CONF "queue_size: $queueSize\n";
    print CONF "batch_size: $batchSize\n";
    print CONF "num_epochs: $nEpoch\n";
    print CONF "num_threads: $nThread\n";
-   print CONF "num_threads_for_queue: 2\n";
    print CONF "random_seed: $randomSeed\n";
+   print CONF "frame_by_frame: 1\n";
+   print CONF "adaptation: 0\n";
    print CONF "\n[Output]\n";
    print CONF "num_models_to_keep: $nKeep\n";
    print CONF "log_interval: $logInterval\n";
    print CONF "save_interval: $saveInterval\n";
+   print CONF "\n[Others]\n";
+   print CONF "all_spkrs: [\"$spkr\"]\n";
+   print CONF "num_feature_dimensions: [";
+
+   foreach $type (@cmp) {
+      print CONF "$ordr{$type}";
+      if ( $cmp[$#cmp] eq $type ) {
+         print CONF "]\n";
+      }
+      else {
+         print CONF ", ";
+      }
+   }
+   print CONF "restore_ckpt: -1\n";
+   close(CONF);
+
+   open( CONF, ">$cfg{'trj'}" ) || die "Cannot open $!";
+   print CONF "[Architecture]\n";
+   print CONF "num_input_units: $nin\n";
+   print CONF "num_hidden_units: [$nhid]\n";
+   print CONF "num_output_units: $nout\n";
+   print CONF "hidden_activation: \"$activations[$activation]\"\n";
+   print CONF "output_activation: \"$activations[0]\"\n";
+   print CONF "\n[Strategy]\n";
+   print CONF "optimizer: \"$optimizers[$optimizer]\"\n";
+   print CONF "learning_rate: $trjLearnRate\n";
+   print CONF "gv_weight: $dnnGVWeight\n";
+   print CONF "keep_prob: $keepProb\n";
+   print CONF "queue_size: $queueSize\n";
+   print CONF "batch_size: 1\n";
+   print CONF "num_epochs: $nTrjEpoch\n";
+   print CONF "num_threads: $nThread\n";
+   print CONF "random_seed: $randomSeed\n";
+   print CONF "frame_by_frame: 0\n";
+   print CONF "adaptation: 0\n";
+   print CONF "\n[Output]\n";
+   print CONF "num_models_to_keep: $nKeep\n";
+   print CONF "log_interval: $logInterval\n";
+   print CONF "save_interval: $saveInterval\n";
+   print CONF "\n[Others]\n";
+   print CONF "all_spkrs: [\"$spkr\"]\n";
+   print CONF "num_feature_dimensions: [";
+
+   foreach $type (@cmp) {
+      print CONF "$ordr{$type}";
+      if ( $cmp[$#cmp] eq $type ) {
+         print CONF "]\n";
+      }
+      else {
+         print CONF ", ";
+      }
+   }
+   print CONF "msd_flags: [";
+   foreach $type (@cmp) {
+      print CONF "$msdi{$type}";
+      if ( $cmp[$#cmp] eq $type ) {
+         print CONF "]\n";
+      }
+      else {
+         print CONF ", ";
+      }
+   }
+   print CONF "window_filenames: [\"";
+   foreach $type (@cmp) {
+      print CONF join "\", \"", @{ $win{$type} };
+      if ( $cmp[$#cmp] eq $type ) {
+         print CONF "\"]\n";
+      }
+      else {
+         print CONF "\", \"";
+      }
+   }
+   print CONF "restore_ckpt: 0\n";
    close(CONF);
 
    open( CONF, ">$cfg{'sdn'}" ) || die "Cannot open $!";
@@ -2020,11 +2099,25 @@ sub make_dnn_config {
    print CONF "num_input_units: $nin\n";
    print CONF "num_hidden_units: [$nhid]\n";
    print CONF "num_output_units: $nout\n";
-   print CONF "hidden_activation: $activations[$activation]\n";
-   print CONF "output_activation: $activations[0]\n";
-   print CONF "\n[Others]\n";
+   print CONF "hidden_activation: \"$activations[$activation]\"\n";
+   print CONF "output_activation: \"$activations[0]\"\n";
+   print CONF "\n[Strategy]\n";
    print CONF "num_threads: $nThread\n";
-   print CONF "restore_ckpt: $restoreCkpt\n";
+   print CONF "frame_by_frame: 1\n";
+   print CONF "\n[Others]\n";
+   print CONF "all_spkrs: [\"$spkr\"]\n";
+   print CONF "num_feature_dimensions: [";
+
+   foreach $type (@cmp) {
+      print CONF "$ordr{$type}";
+      if ( $cmp[$#cmp] eq $type ) {
+         print CONF "]\n";
+      }
+      else {
+         print CONF ", ";
+      }
+   }
+   print CONF "restore_ckpt: 0\n";
    close(CONF);
 }
 
@@ -2145,6 +2238,8 @@ sub make_edfile_upmix($) {
 
 # sub routine to convert statistics file for cmp into one for dur
 sub convstats {
+   my @LINE;
+
    open( IN,  "$stats{'cmp'}" )  || die "Cannot open $!";
    open( OUT, ">$stats{'dur'}" ) || die "Cannot open $!";
    while (<IN>) {
@@ -2290,7 +2385,7 @@ sub make_htsvoice($$) {
    print HTSVOICE ",LPF\n";
    print HTSVOICE "FULLCONTEXT_FORMAT:${fclf}\n";
    print HTSVOICE "FULLCONTEXT_VERSION:${fclv}\n";
-   if ($nosilgv) {
+   if ( $useHmmGV && $nosilgv && @slnt > 0 ) {
       print HTSVOICE "GV_OFF_CONTEXT:";
       for ( $i = 0 ; $i < @slnt ; $i++ ) {
          if ( $i != 0 ) {
@@ -2329,7 +2424,7 @@ sub make_htsvoice($$) {
    print HTSVOICE "NUM_WINDOWS[${tmp}]:1\n";
    foreach $type (@cmp) {
       $tmp = get_stream_name($type);
-      if ($useGV) {
+      if ($useHmmGV) {
          print HTSVOICE "USE_GV[${tmp}]:1\n";
       }
       else {
@@ -2426,9 +2521,9 @@ sub make_htsvoice($$) {
    print HTSVOICE "STREAM_TREE[$tmp]:${s}-${e}\n";
    $file_index += $file_size;
 
-   foreach $type (@cmp) {
-      $tmp = get_stream_name($type);
-      if ($useGV) {
+   if ($useHmmGV) {
+      foreach $type (@cmp) {
+         $tmp       = get_stream_name($type);
          $file_size = get_file_size("${voicedir}/gv-${type}.pdf");
          $s         = $file_index;
          $e         = $file_index + $file_size - 1;
@@ -2436,9 +2531,9 @@ sub make_htsvoice($$) {
          $file_index += $file_size;
       }
    }
-   foreach $type (@cmp) {
-      $tmp = get_stream_name($type);
-      if ( $useGV && $cdgv ) {
+   if ( $useHmmGV && $cdgv ) {
+      foreach $type (@cmp) {
+         $tmp       = get_stream_name($type);
          $file_size = get_file_size("${voicedir}/tree-gv-${type}.inf");
          $s         = $file_index;
          $e         = $file_index + $file_size - 1;
@@ -2510,9 +2605,9 @@ sub make_htsvoice($$) {
    close(I);
    print HTSVOICE $DATA;
 
-   foreach $type (@cmp) {
-      $tmp = get_stream_name($type);
-      if ($useGV) {
+   if ($useHmmGV) {
+      foreach $type (@cmp) {
+         $tmp = get_stream_name($type);
          open( I, "${voicedir}/gv-${type}.pdf" ) || die "Cannot open $!";
          @STAT = stat(I);
          read( I, $DATA, $STAT[7] );
@@ -2520,9 +2615,9 @@ sub make_htsvoice($$) {
          print HTSVOICE $DATA;
       }
    }
-   foreach $type (@cmp) {
-      $tmp = get_stream_name($type);
-      if ( $useGV && $cdgv ) {
+   if ( $useHmmGV && $cdgv ) {
+      foreach $type (@cmp) {
+         $tmp = get_stream_name($type);
          open( I, "${voicedir}/tree-gv-${type}.inf" ) || die "Cannot open $!";
          @STAT = stat(I);
          read( I, $DATA, $STAT[7] );
@@ -2607,6 +2702,9 @@ sub postfiltering_mcp($$) {
    $line .= "$MERGE -n " . ( $ordr{'mgc'} - 2 ) . " -s 0 -N 0 $gendir/${base}.p_b0 | ";
    $line .= "$B2MC -m " .  ( $ordr{'mgc'} - 1 ) . " -a $fw > $gendir/${base}.p_mgc";
    shell($line);
+
+   $line = "rm -f $gendir/weight $gendir/${base}.r0 $gendir/${base}.p_r0 $gendir/${base}.b0 $gendir/${base}.p_b0";
+   shell($line);
 }
 
 # sub routine for formant emphasis in LSP domain
@@ -2679,6 +2777,14 @@ sub gen_param($) {
    my ($gendir) = @_;
    my ( $line, @FILE, $file, $base, $T, $s, $e, $t );
 
+   my $ffosize = 0;
+   foreach $type (@cmp) {
+      if ( $msdi{$type} != 0 ) {
+         $ffosize += 1;
+      }
+      $ffosize += $vSize{'cmp'}{$type};
+   }
+
    $line = `ls $gendir/*.ffo`;
    @FILE = split( '\n', $line );
    print "Processing directory $gendir:\n";
@@ -2687,69 +2793,37 @@ sub gen_param($) {
       chomp($base);
 
       print " Generating parameter sequences from $base.ffo...";
-
-      $vuvsize = 1;
-      $ffosize = $vuvsize + $vSize{'cmp'}{'total'};
-      $T       = get_file_size("$gendir/${base}.ffo ") / $ffosize / 4;
-
-      # generate a mgc sequence
+      $T = get_file_size("$gendir/${base}.ffo") / $ffosize / 4;
       $s = 0;
-      $e = $s + $vSize{'cmp'}{'mgc'} - 1;
-      shell("$BCP +f -s $s -e $e -l $ffosize $file > $gendir/$base.mgc.mean");
-      shell("rm -f $gendir/$base.mgc.var");
-      for ( $t = 0 ; $t < $T ; $t++ ) {
-         shell("cat $var{'mgc'} >> $gendir/$base.mgc.var");
-      }
-      $mgc_win_delta = `cut -d " " -f 2- $windir/$win{'mgc'}[1]`;
-      $mgc_win_accel = `cut -d " " -f 2- $windir/$win{'mgc'}[2]`;
-      chomp $mgc_win_delta;
-      chomp $mgc_win_accel;
-      $line = "$MERGE -l $vSize{'cmp'}{'mgc'} -L $vSize{'cmp'}{'mgc'} $gendir/$base.mgc.mean < $gendir/$base.mgc.var | ";
-      $line .= "$MLPG -l $ordr{'mgc'} -d $mgc_win_delta -d $mgc_win_accel > $gendir/$base.mgc";
-      shell($line);
-      shell("rm -f $gendir/$base.mgc.mean $gendir/$base.mgc.var");
-
-      # generate a vuv sequence
-      $s = $e + 1;
-      $e = $s + $vuvsize - 1;
-      shell("$BCP +f -s $s -e $e -l $ffosize $file | $SOPR -s 0.5 -UNIT > $gendir/$base.vuv");
-
-      # generate a lf0 sequence
-      $s = $e + 1;
-      $e = $s + $vSize{'cmp'}{'lf0'} - 1;
-      shell("$BCP +f -s $s -e $e -l $ffosize $file > $gendir/$base.lf0.mean");
-      shell("rm -f $gendir/$base.lf0.var");
-      for ( $t = 0 ; $t < $T ; $t++ ) {
-         shell("cat $var{'lf0'} >> $gendir/$base.lf0.var");
-      }
-      $lf0_win_delta = `cut -d " " -f 2- $windir/$win{'lf0'}[1]`;
-      $lf0_win_accel = `cut -d " " -f 2- $windir/$win{'lf0'}[2]`;
-      chomp $lf0_win_delta;
-      chomp $lf0_win_accel;
-      $line = "$MERGE -l $vSize{'cmp'}{'lf0'} -L $vSize{'cmp'}{'lf0'} $gendir/$base.lf0.mean < $gendir/$base.lf0.var | ";
-      $line .= "$MLPG -l $ordr{'lf0'} -d $lf0_win_delta -d $lf0_win_accel | ";
-      $line .= "$VOPR -l 1 -m $gendir/$base.vuv | ";
-      $line .= "$SOPR -magic 0 -MAGIC -1.0E+10 > $gendir/$base.lf0";
-      shell($line);
-      shell("rm -f $gendir/$base.lf0.mean $gendir/$base.lf0.var $gendir/$base.vuv");
-
-      # generate a bap sequence
-      if ($usestraight) {
-         $s = $e + 1;
-         $e = $s + $vSize{'cmp'}{'bap'} - 1;
-         shell("$BCP +f -s $s -e $e -l $ffosize $file > $gendir/$base.bap.mean");
-         shell("rm -f $gendir/$base.bap.var");
-         for ( $t = 0 ; $t < $T ; $t++ ) {
-            shell("cat $var{'bap'} >> $gendir/$base.bap.var");
+      $e = -1;
+      foreach my $type (@cmp) {
+         if ( $msdi{$type} != 0 ) {
+            $s = $e + 1;
+            $e = $s;
+            shell("$BCP +f -s $s -e $e -l $ffosize $file | $SOPR -s 0.5 -UNIT | $INTERPOLATE -l 1 -p $ordr{$type} -d > $gendir/$base.$type.msd1");
+            shell("$SOPR -s 1.0 -m 1.0E+10 < $gendir/$base.$type.msd1 > $gendir/$base.$type.msd2");
          }
-         $bap_win_delta = `cut -d " " -f 2- $windir/$win{'bap'}[1]`;
-         $bap_win_accel = `cut -d " " -f 2- $windir/$win{'bap'}[2]`;
-         chomp $bap_win_delta;
-         chomp $bap_win_accel;
-         $line = "$MERGE -l $vSize{'cmp'}{'bap'} -L $vSize{'cmp'}{'bap'} $gendir/$base.bap.mean < $gendir/$base.bap.var | ";
-         $line .= "$MLPG -l $ordr{'bap'} -d $bap_win_delta -d $bap_win_accel > $gendir/$base.bap";
+         $s = $e + 1;
+         $e = $s + $vSize{'cmp'}{$type} - 1;
+         shell("$BCP +f -s $s -e $e -l $ffosize $file > $gendir/$base.$type.mean");
+         shell("rm -f $gendir/$base.$type.var");
+         for ( $t = 0 ; $t < $T ; $t++ ) {
+            shell("$BCUT +f -s $s -e $e $gendir/$base.var >> $gendir/$base.$type.var");
+         }
+         my $opt = "";
+         for ( my $d = 1 ; $d < $nwin{$type} ; $d++ ) {
+            shell("$X2X +af < $windir/$win{$type}[$d] | $BCUT -l 1 -s 1 +f > $gendir/$base.$type.win$d");
+            $opt .= " -d $gendir/$base.$type.win$d ";
+         }
+         $line = "$MERGE -l $vSize{'cmp'}{$type} -L $vSize{'cmp'}{$type} $gendir/$base.$type.mean < $gendir/$base.$type.var | ";
+         $line .= "$MLPG -l $ordr{$type} $opt ";
+         if ( $msdi{$type} != 0 ) {
+            $line .= " | $VOPR -l 1 -m $gendir/$base.$type.msd1 ";
+            $line .= " | $VOPR -l 1 -a $gendir/$base.$type.msd2 ";
+         }
+         $line .= "> $gendir/$base.$type";
          shell($line);
-         shell("rm -f $gendir/$base.bap.mean $gendir/$base.bap.var");
+         shell("rm -f $gendir/$base.$type.mean $gendir/$base.$type.var $gendir/$base.$type.win* $gendir/$base.$type.msd*");
       }
 
       print "done\n";
@@ -2757,8 +2831,8 @@ sub gen_param($) {
 }
 
 # sub routine for speech synthesis from log f0 and Mel-cepstral coefficients
-sub gen_wave($) {
-   my ($gendir) = @_;
+sub gen_wave($$) {
+   my ( $gendir, $pf ) = @_;
    my ( $line, @FILE, $lgopt, $file, $base, $T, $mgc, $lf0, $bap );
 
    $line = `ls $gendir/*.mgc`;
@@ -2769,6 +2843,7 @@ sub gen_wave($) {
    else {
       $lgopt = "";
    }
+
    print "Processing directory $gendir:\n";
    foreach $file (@FILE) {
       $base = `basename $file .mgc`;
@@ -2777,11 +2852,11 @@ sub gen_wave($) {
       if ( $gm == 0 ) {
 
          # apply postfiltering
-         if ($useMSPF) {
+         if ( $pf == 2 ) {
             postfiltering_mspf( $base, $gendir, 'mgc' );
             $mgc = "$gendir/$base.p_mgc";
          }
-         elsif ( !$useGV && $pf_mcp != 1.0 ) {
+         elsif ( $pf == 1 && $pf_mcp != 1.0 ) {
             postfiltering_mcp( $base, $gendir );
             $mgc = "$gendir/$base.p_mgc";
          }
@@ -2792,11 +2867,11 @@ sub gen_wave($) {
       else {
 
          # apply postfiltering
-         if ($useMSPF) {
+         if ( $pf == 2 ) {
             postfiltering_mspf( $base, $gendir, 'mgc' );
             $mgc = "$gendir/$base.p_mgc";
          }
-         elsif ( !$useGV && $pf_lsp != 1.0 ) {
+         elsif ( $pf == 1 && $pf_lsp != 1.0 ) {
             postfiltering_lsp( $base, $gendir );
             $mgc = "$gendir/$base.p_mgc";
          }
@@ -2826,15 +2901,15 @@ sub gen_wave($) {
          # synthesize waveform
          $lfil = `$PERL $datdir/scripts/makefilter.pl $sr 0`;
          $hfil = `$PERL $datdir/scripts/makefilter.pl $sr 1`;
-
          $line = "$SOPR -m 0 $gendir/$base.pit | $EXCITE -n -p $fs | $DFS -b $hfil > $gendir/$base.unv";
          shell($line);
 
          $line = "$EXCITE -n -p $fs $gendir/$base.pit | ";
          $line .= "$DFS -b $lfil | $VOPR -a $gendir/$base.unv | ";
-         $line .= "$MGLSADF -P 5 -m " . ( $ordr{'mgc'} - 1 ) . " -p $fs -a $fw -c $gm $mgc | ";
+         $line .= "$MGLSADF -P 7 -m " . ( $ordr{'mgc'} - 1 ) . " -p $fs -a $fw -c $gm $mgc | ";
          $line .= "$X2X +fs -o > $gendir/$base.raw";
          shell($line);
+
          $line = "$RAW2WAV -s " . ( $sr / 1000 ) . " -d $gendir $gendir/$base.raw";
          shell($line);
 
@@ -2849,7 +2924,7 @@ sub gen_wave($) {
          # convert log F0 to F0
          $line = "$SOPR -magic -1.0E+10 -EXP -MAGIC 0.0 $lf0 > $gendir/${base}.f0 ";
          shell($line);
-         $T = get_file_size("$gendir/${base}.f0 ") / 4;
+         $T = get_file_size("$gendir/${base}.f0") / 4;
 
          # convert Mel-cepstral coefficients to spectrum
          if ( $gm == 0 ) {
@@ -2931,10 +3006,10 @@ sub postfiltering_mspf($$$) {
       # calculate filtered sequence
       push( @seq, msmp2seq( "$gendir/$base.p_$type.mspec_dim$d", "$gendir/$base.$type.mphase_dim$d", $T ) );
    }
-   open( SEQ, ">$gendir/$base.tmp" ) || die "Cannot open $!";
+   open( SEQ, ">$gendir/$base.$type.tmp" ) || die "Cannot open $!";
    print SEQ join( "\n", @seq );
    close(SEQ);
-   shell("$X2X +af $gendir/$base.tmp | $TRANSPOSE -m $ordr{$type} -n $T > $gendir/$base.p_$type.subtracted");
+   shell("$X2X +af $gendir/$base.$type.tmp | $TRANSPOSE -m $ordr{$type} -n $T > $gendir/$base.p_$type.subtracted");
 
    # add utterance-level mean
    $line = get_cmd_vopr( "$gendir/$base.p_$type.subtracted", "-a", "$gendir/$base.$type.mean", $type );
@@ -3041,7 +3116,7 @@ sub get_cmd_seq2mp($$$) {
 }
 
 # sub routine for making force-aligned label files
-sub make_full_fal() {
+sub make_full_fal {
    my ( $line, $base, $istr, $lstr, @iarr, @larr );
 
    open( ISCP, "$scp{'trn'}" )   || die "Cannot open $!";
@@ -3126,8 +3201,8 @@ sub make_mspf($) {
                      if ( $arr[2] eq "$slnt[$j]" ) { $find = 1; last; }
                   }
                   if ( $find == 0 ) {
-                     $start = int( $arr[0] * ( 1.0e-7 / ( $fs / $sr ) ) );
-                     $end   = int( $arr[1] * ( 1.0e-7 / ( $fs / $sr ) ) );
+                     $start = int( $arr[0] * ( 1.0E-07 / ( $fs / $sr ) ) );
+                     $end   = int( $arr[1] * ( 1.0E-07 / ( $fs / $sr ) ) );
                      shell("$BCUT -s $start -e $end -l $ordr{$type} < $mspfdatdir{$mspftype}/$base.$type.subtracted >> $mspfdatdir{$mspftype}/$base.$type.subtracted.no-sil");
                   }
                }
@@ -3165,3 +3240,5 @@ sub make_mspf($) {
       }
    }
 }
+
+##################################################################################################

@@ -2910,7 +2910,9 @@ sub gen_wave($$) {
          $line .= "$X2X +fs -o > $gendir/$base.raw";
          shell($line);
 
-         $line = "$RAW2WAV -s " . ( $sr / 1000 ) . " -d $gendir $gendir/$base.raw";
+         #$line = "$RAW2WAV -s " . ( $sr / 1000 ) . " -d $gendir $gendir/$base.raw";
+         #shaopf 2019.3.15 raw2wav no longer exist, now is rawtowav, so the parameters change accordingly
+         $line = "$RAW2WAV $sr $bit $gendir/$base.raw $gendir/$base.wav";
          shell($line);
 
          $line = "rm -f $gendir/$base.unv";

@@ -161,6 +161,7 @@ $ft = @FFTLEN@;     # FFT length (point)
 $fw = @FREQWARP@;   # frequency warping
 $gm = @GAMMA@;      # pole/zero representation weight
 $lg = @LNGAIN@;     # use log gain instead of linear gain
+$bit= 16;           # bit for new rawtowav
 
 # speech synthesis
 $pf_mcp = @PSTFILTER_MCP@; # postfiltering factor for mel-cepstrum

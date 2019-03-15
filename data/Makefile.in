@@ -148,8 +148,6 @@ features:
 				fi; \
 			else \
 				FRAMESHIFTMS=`echo $(FRAMESHIFT) | $(X2X) +af | $(SOPR) -m 1000 -d $(SAMPFREQ) | $(X2X) +fa`; \
-				#$(RAW2WAV) -s $${SAMPKHZ} -d . $${raw}; \
-				#shaopf 2019.3.15 raw2wav turn to rawtowav, the parameters change accordingly
 				$(RAW2WAV) $(SAMPFREQ) $(BITSRAW2WAV) $${base}.raw $${base}.wav; \
 				echo "path(path,'$(STRAIGHT)');"                    >  $${base}.m; \
 				echo "prm.F0frameUpdateInterval=$${FRAMESHIFTMS};"  >> $${base}.m; \

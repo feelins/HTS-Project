@@ -148,13 +148,13 @@ features:
 				fi; \
 			else \
 				FRAMESHIFTMS=`echo $(FRAMESHIFT) | $(X2X) +af | $(SOPR) -m 1000 -d $(SAMPFREQ) | $(X2X) +fa`; \
-				$(RAW2WAV) $(SAMPFREQ) $(BITSRAW2WAV) $${base}.raw $${base}.wav; \
+				cp $${raw} $${base}.wav; \
 				echo "path(path,'$(STRAIGHT)');"                    >  $${base}.m; \
 				echo "prm.F0frameUpdateInterval=$${FRAMESHIFTMS};"  >> $${base}.m; \
 				echo "prm.F0searchUpperBound=$(UPPERF0);"           >> $${base}.m; \
 				echo "prm.F0searchLowerBound=$(LOWERF0);"           >> $${base}.m; \
 				echo "prm.spectralUpdateInterval=$${FRAMESHIFTMS};" >> $${base}.m; \
-				echo "[x,fs]=wavread('$${base}.wav');"              >> $${base}.m; \
+				echo "[x,fs]=audioread('$${base}.wav');"              >> $${base}.m; \
 				echo "[f0,ap] = exstraightsource(x,fs,prm);"        >> $${base}.m; \
 				echo "[sp] = exstraightspec(x,f0,fs,prm);"          >> $${base}.m; \
 				echo "ap = ap';"                                    >> $${base}.m; \

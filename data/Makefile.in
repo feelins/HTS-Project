@@ -478,7 +478,7 @@ scp:
 
 	rm -f scp/train.cmp.scp
 	for cmp in @PWD@/data/cmp/*.cmp; do \
-		if [ -s $${cmp} -a -s labels/mono/`basename $${cmp} .cmp`.lab -a -s labels/full/`basename $${cmp} .cmp`.lab ]; then \
+		if [ -s $${cmp} -a -s labels/mono/`basename $${cmp} .cmp`.lab -a -s labels/full/`basename $${cmp} .cmp`.lab  -a -s labels/mono/`basename $${cmp} .cmp`.lab ]; then \
 			echo $${cmp} >> scp/train.cmp.scp; \
 		fi \
 	done

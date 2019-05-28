@@ -71,6 +71,12 @@ USESTRAIGHT = @USESTRAIGHT@
 MATLAB      = @MATLAB@
 STRAIGHT    = @STRAIGHT@
 
+# WORLD
+USEWORLD = @USEWORLD@
+REAPERF0 = @USEREAPERF0@
+WORLDANA = @WORLD@
+REAPER   = @REAPER@
+
 # DNN
 USEDNN = @USEDNN@
 
@@ -121,7 +127,7 @@ features:
 		max=`$(X2X) +sf $${raw} | $(MINMAX) | $(X2X) +fa | tail -n 1`; \
 		if [ -s $${raw} -a $${min} -gt -32768 -a $${max} -lt 32767 ]; then \
 			echo "Extracting features from $${raw}"; \
-			if [ $(USESTRAIGHT) -eq 0 ]; then \
+			if [ $(USESTRAIGHT) -eq 0 -a $(USEWORLD) -eq 0 ]; then \
 				$(X2X) +sf $${raw} | $(PITCH) -H $(UPPERF0) -L $(LOWERF0) -p $(FRAMESHIFT) -s $${SAMPKHZ} -o 2 > lf0/$${base}.lf0; \
 				if [ $(GAMMA) -eq 0 ]; then \
 					$(X2X) +sf $${raw} | \
@@ -147,57 +153,103 @@ features:
 					rm -f mgc/$${base}.mgc; \
 				fi; \
 			else \
-				FRAMESHIFTMS=`echo $(FRAMESHIFT) | $(X2X) +af | $(SOPR) -m 1000 -d $(SAMPFREQ) | $(X2X) +fa`; \
-				cp $${raw} $${base}.wav; \
-				echo "path(path,'$(STRAIGHT)');"                    >  $${base}.m; \
-				echo "prm.F0frameUpdateInterval=$${FRAMESHIFTMS};"  >> $${base}.m; \
-				echo "prm.F0searchUpperBound=$(UPPERF0);"           >> $${base}.m; \
-				echo "prm.F0searchLowerBound=$(LOWERF0);"           >> $${base}.m; \
-				echo "prm.spectralUpdateInterval=$${FRAMESHIFTMS};" >> $${base}.m; \
-				echo "[x,fs]=audioread('$${base}.wav');"              >> $${base}.m; \
-				echo "[f0,ap] = exstraightsource(x,fs,prm);"        >> $${base}.m; \
-				echo "[sp] = exstraightspec(x,f0,fs,prm);"          >> $${base}.m; \
-				echo "ap = ap';"                                    >> $${base}.m; \
-				echo "sp = sp';"                                    >> $${base}.m; \
-				echo "sp = sp*32768.0;"                             >> $${base}.m; \
-				echo "save '$${base}.f0' f0 -ascii;"                >> $${base}.m; \
-				echo "save '$${base}.ap' ap -ascii;"                >> $${base}.m; \
-				echo "save '$${base}.sp' sp -ascii;"                >> $${base}.m; \
-				echo "quit;"                                        >> $${base}.m; \
-				$(MATLAB) < $${base}.m; \
-				if [ -s $${base}.f0 ]; then \
-					$(X2X) +af $${base}.f0 | $(SOPR) -magic 0.0 -LN -MAGIC -1.0E+10 > lf0/$${base}.lf0; \
-					if [ -n "`$(NAN) lf0/$${base}.lf0`" ]; then \
-						echo " Failed to extract features from $${raw}"; \
-						rm -f lf0/$${base}.lf0; \
-					fi; \
-				fi; \
-				if [ -s $${base}.sp ]; then \
-					if [ $(GAMMA) -eq 0 ]; then \
-						$(X2X) +af $${base}.sp | \
-						$(MGCEP) -a $(FREQWARP) -m $(MGCORDER) -l $(FFTLEN) -e 1.0E-08 -j 0 -f 0.0 -q 3 > mgc/$${base}.mgc; \
-					else \
-						if [ $(LNGAIN) -eq 1 ]; then \
-							GAINOPT="-L"; \
+				if [ $(USESTRAIGHT) -eq 1 ]; then \
+					FRAMESHIFTMS=`echo $(FRAMESHIFT) | $(X2X) +af | $(SOPR) -m 1000 -d $(SAMPFREQ) | $(X2X) +fa`; \
+					cp $${raw} $${base}.wav; \
+					echo "path(path,'$(STRAIGHT)');"                    >  $${base}.m; \
+					echo "prm.F0frameUpdateInterval=$${FRAMESHIFTMS};"  >> $${base}.m; \
+					echo "prm.F0searchUpperBound=$(UPPERF0);"           >> $${base}.m; \
+					echo "prm.F0searchLowerBound=$(LOWERF0);"           >> $${base}.m; \
+					echo "prm.spectralUpdateInterval=$${FRAMESHIFTMS};" >> $${base}.m; \
+					echo "[x,fs]=audioread('$${base}.wav');"            >> $${base}.m; \
+					echo "[f0,ap] = exstraightsource(x,fs,prm);"        >> $${base}.m; \
+					echo "[sp] = exstraightspec(x,f0,fs,prm);"          >> $${base}.m; \
+					echo "ap = ap';"                                    >> $${base}.m; \
+					echo "sp = sp';"                                    >> $${base}.m; \
+					echo "sp = sp*32768.0;"                             >> $${base}.m; \
+					echo "save '$${base}.f0' f0 -ascii;"                >> $${base}.m; \
+					echo "save '$${base}.ap' ap -ascii;"                >> $${base}.m; \
+					echo "save '$${base}.sp' sp -ascii;"                >> $${base}.m; \
+					echo "quit;"                                        >> $${base}.m; \
+					$(MATLAB) < $${base}.m; \
+					if [ -s $${base}.f0 ]; then \
+						$(X2X) +af $${base}.f0 | $(SOPR) -magic 0.0 -LN -MAGIC -1.0E+10 > lf0/$${base}.lf0; \
+						if [ -n "`$(NAN) lf0/$${base}.lf0`" ]; then \
+							echo " Failed to extract features from $${raw}"; \
+							rm -f lf0/$${base}.lf0; \
 						fi; \
-						$(X2X) +af $${base}.sp | \
-						$(MGCEP) -a $(FREQWARP) -c $(GAMMA) -m $(MGCORDER) -l $(FFTLEN) -e 1.0E-08 -j 0 -f 0.0 -q 3 -o 4 | \
-						$(LPC2LSP) -m $(MGCORDER) -s $${SAMPKHZ} $${GAINOPT} -n $(FFTLEN) -p 8 -d 1.0E-08 > mgc/$${base}.mgc; \
 					fi; \
-					if [ -n "`$(NAN) mgc/$${base}.mgc`" ]; then \
-						echo " Failed to extract features from $${raw}"; \
-						rm -f mgc/$${base}.mgc; \
+					if [ -s $${base}.sp ]; then \
+						if [ $(GAMMA) -eq 0 ]; then \
+							$(X2X) +af $${base}.sp | \
+							$(MGCEP) -a $(FREQWARP) -m $(MGCORDER) -l $(FFTLEN) -e 1.0E-08 -j 0 -f 0.0 -q 3 > mgc/$${base}.mgc; \
+						else \
+							if [ $(LNGAIN) -eq 1 ]; then \
+								GAINOPT="-L"; \
+							fi; \
+							$(X2X) +af $${base}.sp | \
+							$(MGCEP) -a $(FREQWARP) -c $(GAMMA) -m $(MGCORDER) -l $(FFTLEN) -e 1.0E-08 -j 0 -f 0.0 -q 3 -o 4 | \
+							$(LPC2LSP) -m $(MGCORDER) -s $${SAMPKHZ} $${GAINOPT} -n $(FFTLEN) -p 8 -d 1.0E-08 > mgc/$${base}.mgc; \
+						fi; \
+						if [ -n "`$(NAN) mgc/$${base}.mgc`" ]; then \
+							echo " Failed to extract features from $${raw}"; \
+							rm -f mgc/$${base}.mgc; \
+						fi; \
 					fi; \
+					if [ -s $${base}.ap ]; then \
+						$(X2X) +af $${base}.ap | \
+						$(MGCEP) -a $(FREQWARP) -m $(BAPORDER) -l $(FFTLEN) -e 1.0E-08 -j 0 -f 0.0 -q 1 > bap/$${base}.bap; \
+						if [ -n "`$(NAN) bap/$${base}.bap`" ]; then \
+							echo " Failed to extract features from $${raw}"; \
+							rm -f bap/$${base}.bap; \
+						fi; \
+					fi; \
+					rm -f $${base}.m $${base}.wav $${base}.f0 $${base}.ap $${base}.sp; \
+				else \
+					cp $${raw} $${base}.wav; \
+					$(WORLDANA) $${base}.wav $${base}.f0 $${base}.sp $${base}.ap; \
+					if [ $(REAPERF0) -eq 1 ]; then \
+						$(REAPER) -a -s -x $(UPPERF0) -m $(LOWERF0) -u 0.005 -i $${base}.wav -f $${base}.reaper; \
+						sed '1,7d' $${base}.reaper | $(AWK) '{print $$3}' > $${base}.f0; \
+						$(X2X) +af $${base}.f0 | $(SOPR) -magic -1.0 -LN -MAGIC -1.0E+10 > lf0/$${base}.lf0; \
+						if [ -n "`$(NAN) lf0/$${base}.lf0`" ]; then \
+							echo " Failed to extract features from $${raw}"; \
+							rm -f lf0/$${base}.lf0; \
+						fi; \
+					else \
+						$(X2X) +df $${base}.f0 | $(SOPR) -magic 0.0 -LN -MAGIC -1.0E+10 > lf0/$${base}.lf0; \
+						if [ -n "`$(NAN) lf0/$${base}.lf0`" ]; then \
+							echo " Failed to extract features from $${raw}"; \
+							rm -f lf0/$${base}.lf0; \
+						fi; \
+					fi; \
+					if [ -s $${base}.sp ]; then \
+						if [ $(GAMMA) -eq 0 ]; then \
+							$(X2X) +df $${base}.sp | \
+							$(SOPR) -R -m 32768.0 | \
+							$(MGCEP) -a $(FREQWARP) -m $(MGCORDER) -l $(FFTLEN) -e 1.0E-08 -j 0 -f 0.0 -q 3 > mgc/$${base}.mgc; \
+						else \
+							if [ $(LNGAIN) -eq 1 ]; then \
+								GAINOPT="-L"; \
+							fi; \
+							$(X2X) +af $${base}.sp | \
+							$(MGCEP) -a $(FREQWARP) -c $(GAMMA) -m $(MGCORDER) -l $(FFTLEN) -e 1.0E-08 -j 0 -f 0.0 -q 3 -o 4 | \
+							$(LPC2LSP) -m $(MGCORDER) -s $${SAMPKHZ} $${GAINOPT} -n $(FFTLEN) -p 8 -d 1.0E-08 > mgc/$${base}.mgc; \
+						fi; \
+						if [ -n "`$(NAN) mgc/$${base}.mgc`" ]; then \
+							echo " Failed to extract features from $${raw}"; \
+							rm -f mgc/$${base}.mgc; \
+						fi; \
+					fi; \
+					if [ -s $${base}.ap ]; then \
+						$(X2X) +df $${base}.ap > bap/$${base}.bap; \
+						if [ -n "`$(NAN) bap/$${base}.bap`" ]; then \
+							echo " Failed to extract features from $${raw}"; \
+							rm -f bap/$${base}.bap; \
+						fi; \
+					fi; \
+					rm -f $${base}.m $${base}.wav $${base}.f0 $${base}.ap $${base}.sp $${base}.reaper; \
 				fi; \
-				if [ -s $${base}.ap ]; then \
-					$(X2X) +af $${base}.ap | \
-					$(MGCEP) -a $(FREQWARP) -m $(BAPORDER) -l $(FFTLEN) -e 1.0E-08 -j 0 -f 0.0 -q 1 > bap/$${base}.bap; \
-					if [ -n "`$(NAN) bap/$${base}.bap`" ]; then \
-						echo " Failed to extract features from $${raw}"; \
-						rm -f bap/$${base}.bap; \
-					fi; \
-				fi; \
-				rm -f $${base}.m $${base}.wav $${base}.f0 $${base}.ap $${base}.sp; \
 			fi; \
 		fi; \
 	done
@@ -208,7 +260,7 @@ cmp:
 	for raw in raw/*.wav; do \
 		base=`basename $${raw} .wav`; \
 		echo "Composing training data for $${base}"; \
-		if [ $(USESTRAIGHT) -eq 0 ]; then \
+		if [ $(USESTRAIGHT) -eq 0 -a $(USEWORLD) -eq 0 ]; then \
 			MGCDIM=`expr $(MGCORDER) + 1`; \
 			LF0DIM=1; \
 			MGCWINDIM=`expr $(NMGCWIN) \* $${MGCDIM}`; \
@@ -495,7 +547,7 @@ question:
 	$(PERL) scripts/makequestion.pl configs/$(QNAME).conf > questions/questions_$(QNAME).hed
 	grep -e 'Num.*Utterance' questions/questions_$(QNAME).hed > questions/questions_utt_$(QNAME).hed
 
-clean: clean-mgc clean-lf0 clean-bap clean-cmp clean-ffo clean-stats clean-lab clean-mlf clean-list clean-scp clean-question
+clean: clean-mgc clean-lf0 clean-bap clean-cmp clean-ffo clean-stats clean-mlf clean-list clean-scp clean-question
 
 clean-mgc:
 	rm -rf mgc

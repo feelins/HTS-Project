@@ -39,6 +39,16 @@
                  --with-matlab-search-path=/usr/local/matlab/bin \
                  --with-straight-path=/usr/local/STRAIGHTV40 \
                  USESTRAIGHT=1
+                 
+   If you use WORLD, configure script can be run as follows.
+
+   % ./configure --with-fest-search-path=/home/shaopf/study/festival25/festival/examples \
+                 --with-sptk-search-path=/usr/local/SPTK \
+                 --with-hts-search-path=/usr/local/HTS-2.3/bin \
+                 --with-hts-engine-search-path=/usr/local/hts_engine \
+                 --with-world-path=/home/shaopf/study/merlin_Mandarin/tools/bin/WORLD \
+                 --with-reaper-path=/home/shaopf/study/merlin_Mandarin/tools/bin/REAPER/reaper \
+                 USEWORLD=1 USEREAPER=1 SAMPFREQ=48000 LOWERF0=100 UPPERF0=450 QNAME=ma_CN.talk
 
    If you use neural networks, configure script can be run as follows.
 

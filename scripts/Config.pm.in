@@ -55,7 +55,7 @@ $usestraight = '@USESTRAIGHT@';
 $useworld    = '@USEWORLD@';
 
 @SET        = ('cmp', 'dur');
-if ( !$usestraight && $useworld ) {
+if ( !$usestraight && !$useworld ) {
    @cmp     = ('mgc', 'lf0');
 }
 else {

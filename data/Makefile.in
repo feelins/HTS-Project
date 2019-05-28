@@ -73,7 +73,7 @@ STRAIGHT    = @STRAIGHT@
 
 # WORLD
 USEWORLD = @USEWORLD@
-REAPERF0 = @USEREAPERF0@
+USEREAPER = @USEREAPER@
 WORLDANA = @WORLD@/analysis
 REAPER   = @REAPER@
 
@@ -208,7 +208,7 @@ features:
 				else \
 					cp $${raw} $${base}.wav; \
 					$(WORLDANA) $${base}.wav $${base}.f0 $${base}.sp $${base}.ap; \
-					if [ $(REAPERF0) -eq 1 ]; then \
+					if [ $(USEREAPER) -eq 1 ]; then \
 						$(REAPER) -a -s -x $(UPPERF0) -m $(LOWERF0) -u 0.005 -i $${base}.wav -f $${base}.reaper; \
 						sed '1,7d' $${base}.reaper | $(AWK) '{print $$3}' > $${base}.f0; \
 						$(X2X) +af $${base}.f0 | $(SOPR) -magic -1.0 -LN -MAGIC -1.0E+10 > lf0/$${base}.lf0; \

@@ -797,7 +797,7 @@ if ($WGEN1) {
 }
 
 # HHEd (converting mmfs to the HTS voice format)
-if ( $CONVM && !$usestraight ) {
+if ( $CONVM && !$usestraight && !$useworld ) {
    print_time("converting mmfs to the HTS voice format 020/039");
 
    # models and trees
@@ -839,7 +839,7 @@ if ( $CONVM && !$usestraight ) {
 }
 
 # hts_engine (synthesizing waveforms using hts_engine)
-if ( $ENGIN && !$usestraight ) {
+if ( $ENGIN && !$usestraight && !$useworld ) {
    print_time("synthesizing waveforms using hts_engine 021/039");
 
    $dir = "${prjdir}/gen/ver${ver}/hts_engine";
@@ -2891,7 +2891,7 @@ sub gen_wave($$) {
       $lf0 = "$gendir/$base.lf0";
       $bap = "$gendir/$base.bap";
 
-      if ( !$usestraight && -s $file && -s $lf0 ) {
+      if ( !$usestraight && !$useworld && -s $file && -s $lf0 ) {
          print " Synthesizing a speech waveform from $base.mgc and $base.lf0...";
 
          # convert log F0 to pitch
@@ -2963,6 +2963,29 @@ sub gen_wave($$) {
 
          $line = "rm -f $gendir/$base.m";
          shell($line);
+
+         print "done\n";
+      }
+　　　elsif ( $useworld && -s $file && -s $lf0 && -s $bap ) {
+         print " Synthesizing a speech waveform $base.wav... ";
+
+         # convert log F0 to F0
+         $line = "$SOPR -magic -1.0E+10 -EXP -MAGIC 0.0 $lf0 | $X2X +fd > $gendir/${base}.f0 ";
+         shell($line);
+
+         # convert Mel-cepstral coefficients to spectrum
+         if ( $gm == 0 ) {
+            shell( "$MGC2SP -a $fw -g $gm -m " . ( $ordr{'mgc'} - 1 ) . " -l $ft -o 2 $mgc | $SOPR -d 32768.0 -P | $X2X +fd > $gendir/$base.sp" );
+         }
+         else {
+            shell( "$MGC2SP -a $fw -c $gm -m " . ( $ordr{'mgc'} - 1 ) . " -l $ft -o 2 $mgc > $gendir/$base.sp" );
+         }
+
+         # convert band-aperiodicity to aperiodicity
+         shell( "$SOPR -c 0 $bap | $X2X +fd > $gendir/$base.ap" );
+
+         # synthesize waveform
+         shell("$WORLDSYN $ft $sr $gendir/$base.f0 $gendir/$base.sp $gendir/$base.ap $gendir/$base.wav");
 
          print "done\n";
       }

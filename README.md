@@ -5,7 +5,7 @@ HTS-demo project with blank data, expecially extended for Mandarin Chinese SPSS 
 ---create dir 'logs' in the project dir, so you can find most of the logs of step, you can find details in them. Also, it create a log file in the project dir as befrore..  
 
 2019.05.28  
----add option that can use encoder WORLD
+---add option that can use encoder WORLD  
 ------extract 250 utterances with WORLD: 3 minutes  
 ------extract 250 utterances with WORLD and REAPER: 8 minutes  
 ---you can use multiprocess with Python in ../project/data/scripts/extract_features_world.py  

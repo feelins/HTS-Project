@@ -2966,7 +2966,7 @@ sub gen_wave($$) {
 
          print "done\n";
       }
-　　　elsif ( $useworld && -s $file && -s $lf0 && -s $bap ) {
+      elsif ( $useworld && -s $file && -s $lf0 && -s $bap ) {
          print " Synthesizing a speech waveform $base.wav... ";
 
          # convert log F0 to F0

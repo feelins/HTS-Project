@@ -286,7 +286,7 @@ $MATLAB   = '@MATLAB@';
 $STRAIGHT = '@STRAIGHT@';
 
 # WORLD
-$WORLDSYN = '@WORLDSYN';
+$WORLDSYN = '@WORLD@/synth';
 
 
 # Switch ================================

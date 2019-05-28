@@ -334,6 +334,48 @@ fi
 AC_SUBST(STRAIGHT)
 
 
+# WORLD
+# WORLD search path
+AC_ARG_WITH(world-path,
+		AS_HELP_STRING([--with-world-path],[specify the WORLD path]),
+		[WORLD=$withval])
+if test ! -f "$WORLD/analysis"; then
+	if test -z "$USEWORLD"; then
+		:
+	elif test $USEWORLD -ne 1; then
+		:
+	else
+		AC_MSG_ERROR(Can't find analysis in $WORLD)
+	fi
+fi
+if test ! -f "$WORLD/synth";   then
+	if test -z "$USEWORLD"; then
+		:
+	elif test $USEWORLD -ne 1; then
+		:
+	else
+		AC_MSG_ERROR(Can't find synth in $WORLD)
+	fi
+fi
+AC_SUBST(WORLD)
+
+
+# REAPER
+# REAPER search path
+AC_ARG_WITH(reaper-path,
+		AS_HELP_STRING([--with-reaper-path],[specify the REAPER path]),
+		[REAPER=$withval])
+if test ! -f "$REAPER"; then
+	if test -z "$USEREAPER"; then
+		:
+	elif test $USEREAPER -ne 1; then
+		:
+	else
+		AC_MSG_ERROR(Can't find reaper in $REAPER)
+	fi
+fi
+AC_SUBST(REAPER)
+
 
 # HTS commands
 # HTS search path
@@ -400,9 +442,9 @@ AC_ARG_WITH(hts-engine-search-path,
 # hts_engine
 AC_PATH_PROG([ENGINE], [hts_engine], [:], [${hts_engine_search_path}:$PATH])
 if test ! -f "$ENGINE"; then
-	if test -z "$USESTRAIGHT"; then
+	if test -z "$USESTRAIGHT" -a test -z "$USEWORLD"; then
 		AC_MSG_ERROR(Can't find hts_engine)
-	elif test $USESTRAIGHT -ne 1; then
+	elif test $USESTRAIGHT -ne 1 -a test $USEWORLD -ne 1; then
 		AC_MSG_ERROR(Can't find hts_engine)
 	else
 		:
@@ -471,6 +513,8 @@ AC_SUBST(PWD)
 # parse command-line arguments
 AC_ARG_VAR([USEUTT],[generate labels from utt files instead of text files (0:off or 1:on, default=1)])
 AC_ARG_VAR([USESTRAIGHT],[turn on STRAIGHT-based analysis (0:off or 1:on, default=0)])
+AC_ARG_VAR([USEWORLD],[turn on WORLD-based analysis (0:off or 1:on, default=0)])
+AC_ARG_VAR([USEREAPER],[turn on REAPER F0 Extraction (0:off or 1:on, default=0)])
 AC_ARG_VAR([FRAMELEN],[frame length in point (default=1200)])
 AC_ARG_VAR([FRAMESHIFT],[frame shift in point (default=240)])
 AC_ARG_VAR([WINDOWTYPE],[window type -> 0: Blackman  1: Hamming  2: Hanning (default=1)])
@@ -495,6 +539,14 @@ fi
 
 if test -z "$USESTRAIGHT"; then
 	USESTRAIGHT=0
+fi
+
+if test -z "$USEWORLD"; then
+	USEWORLD=0
+fi
+
+if test -z "$USEREAPER"; then
+	USEREAPER=0
 fi
 
 if test -z "$FRAMELEN"; then
@@ -533,7 +585,33 @@ else
 	fi
 fi
 
-if test -z "$FREQWARP"; then
+if test "$USEWORLD" -eq 1; then
+	if test $SAMPFREQ -le 16000; then
+		FFTLEN=1024
+		FREQWARP=0.58
+		MGCORDER=59
+		BAPORDER=4
+	elif test $SAMPFREQ -le 22050; then
+		FFTLEN=2048
+		FREQWARP=0.65
+		MGCORDER=59
+		BAPORDER=4
+	elif test $SAMPFREQ -le 44100; then
+		FFTLEN=2048
+		FREQWARP=0.76
+		MGCORDER=59
+		BAPORDER=4
+	elif test $SAMPFREQ -le 48000; then
+		FFTLEN=2048
+		FREQWARP=0.77
+		MGCORDER=59
+		BAPORDER=4
+	else
+		AC_MSG_ERROR(As of now, we don't support curren sampling rate on WORLD[16000,22050,44100,48000].)
+	fi
+fi
+
+if test -z "$FREQWARP" -a test $USEWORLD -ne 1; then
 	case $SAMPFREQ in
 		8000)  FREQWARP=0.31 ;;
 		10000) FREQWARP=0.35 ;;
@@ -552,7 +630,7 @@ if test -z "$GAMMA"; then
 	GAMMA=0
 fi
 
-if test -z "$MGCORDER"; then
+if test -z "$MGCORDER" -a test $USEWORLD -ne 1; then
 	if test $GAMMA -eq 0; then
 		MGCORDER=34
 	else
@@ -560,7 +638,7 @@ if test -z "$MGCORDER"; then
 	fi
 fi
 
-if test -z "$BAPORDER"; then
+if test -z "$BAPORDER" -a test $USEWORLD -ne 1; then
 	BAPORDER=24
 fi
 
@@ -604,6 +682,8 @@ fi
 # substitute variables
 AC_SUBST(USEUTT)
 AC_SUBST(USESTRAIGHT)
+AC_SUBST(USEWORLD)
+AC_SUBST(USEREAPER)
 AC_SUBST(FRAMELEN)
 AC_SUBST(FRAMESHIFT)
 AC_SUBST(WINDOWTYPE)

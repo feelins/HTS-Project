@@ -662,6 +662,8 @@ WINDOWTYPE
 FRAMESHIFT
 FRAMELEN
 USESTRAIGHT
+USEWORLD
+USEREAPER
 USEUTT
 PWD
 QNAME
@@ -680,6 +682,8 @@ HLIST
 HCOMPV
 HMGENS
 STRAIGHT
+WORLD
+REAPER
 MATLAB
 INTERPOLATE
 MLPG
@@ -767,6 +771,8 @@ with_fest_search_path
 with_sptk_search_path
 with_matlab_search_path
 with_straight_path
+with_world_path
+with_reaper_path
 with_hts_search_path
 with_hts_engine_search_path
 '
@@ -781,6 +787,8 @@ VER
 QNAME
 USEUTT
 USESTRAIGHT
+USEWORLD
+USEREAPER
 FRAMELEN
 FRAMESHIFT
 WINDOWTYPE
@@ -1469,6 +1477,8 @@ Optional Packages:
   --with-matlab-search-path
                           specify the additional MATLAB binary search path
   --with-straight-path    specify the STRAIGHT MATLAB code path
+  --with-world-path       specify the WORLD path
+  --with-reaper-path      specify the REAPER path
   --with-hts-search-path  specify the additional HTS binary search path
   --with-hts-engine-search-path
                           specify the additional hts_engine binary search path
@@ -1485,6 +1495,8 @@ Some influential environment variables:
   USEUTT      generate labels from utt files instead of text files (0:off or
               1:on, default=1)
   USESTRAIGHT turn on STRAIGHT-based analysis (0:off or 1:on, default=0)
+  USEWORLD    turn on WORLD-based analysis (0:off or 1:on, default=0)
+  USEREAPER   turn on REAPER F0 Extraction (0:off or 1:on, default=0)
   FRAMELEN    frame length in point (default=1200)
   FRAMESHIFT  frame shift in point (default=240)
   WINDOWTYPE  window type -> 0: Blackman 1: Hamming 2: Hanning (default=1)
@@ -4120,6 +4132,88 @@ if test ! -f "$STRAIGHT/exstraightsynth.p"  -a ! -f "$STRAIGHT/exstraightsynth.m
 	fi
 fi
 
+# WORLD
+# Check whether --with-world-path was given.
+if test "${with_world_path+set}" = set; then :
+  withval=$with_world_path; WORLD=$withval
+fi
+
+# Extract the first word of "world", so it can be a program name with args.
+set dummy world; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_path_WORLD+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  case $WORLD in
+  [\\/]* | ?:[\\/]*)
+  ac_cv_path_WORLD="$WORLD" # Let the user override the test with a path.
+  ;;
+  *)
+  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+as_dummy="${world_search_path}:$PATH"
+for as_dir in $as_dummy
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_path_WORLD="$as_dir/$ac_word$ac_exec_ext"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+  test -z "$ac_cv_path_WORLD" && ac_cv_path_WORLD=":"
+  ;;
+esac
+fi
+WORLD=$ac_cv_path_WORLD
+if test -n "$WORLD"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $WORLD" >&5
+$as_echo "$WORLD" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+if test ! -f "$WORLD/analysis"; then
+	if test -z "$USEWORLD"; then
+		:
+	elif test $USEWORLD -ne 1; then
+		:
+	else
+		as_fn_error $? "Can't find analysis in $WORLD"
+	fi
+fi
+if test ! -f "$WORLD/synth";   then
+	if test -z "$USEWORLD"; then
+		:
+	elif test $USEWORLD -ne 1; then
+		:
+	else
+		as_fn_error $? "Can't find synth in $WORLD"
+	fi
+fi
+
+
+# REAPER
+# Check whether --with-reaper-path was given.
+if test "${with_reaper_path+set}" = set; then :
+  withval=$with_reaper_path; REAPER=$withval
+fi
+
+if test ! -f "$REAPER"; then
+	if test -z "$USEREAPER"; then
+		:
+	elif test $USEREAPER -ne 1; then
+		:
+	else
+		as_fn_error $? "Can't find analysis in $REAPER"
+	fi
+fi
 
 
 
@@ -4563,9 +4657,9 @@ fi
 
 
 if test ! -f "$ENGINE"; then
-	if test -z "$USESTRAIGHT"; then
+	if test -z "$USESTRAIGHT" -a test -z "$USEWORLD"; then
 		as_fn_error $? "Can't find hts_engine" "$LINENO" 5
-	elif test $USESTRAIGHT -ne 1; then
+	elif test $USESTRAIGHT -ne 1 -a test $USEWORLD -ne 1; then
 		as_fn_error $? "Can't find hts_engine" "$LINENO" 5
 	else
 		:
@@ -4660,6 +4754,10 @@ if test -z "$USESTRAIGHT"; then
 	USESTRAIGHT=0
 fi
 
+if test -z "$USEWORLD"; then
+	USEWORLD=0
+fi
+
 if test -z "$FRAMELEN"; then
 	FRAMELEN=1200
 fi
@@ -4693,6 +4791,32 @@ if test "$USESTRAIGHT" -eq 1; then
 else
 	if test -z "$FFTLEN"; then
 		FFTLEN=2048
+	fi
+fi
+
+if test "$USEWORLD" -eq 1; then
+	if test $SAMPFREQ -le 16000; then
+		FFTLEN=1024
+		FREQWARP=0.58
+		MGCORDER=59
+		BAPORDER=4
+	elif test $SAMPFREQ -le 22050; then
+		FFTLEN=2048
+		FREQWARP=0.65
+		MGCORDER=59
+		BAPORDER=4
+	elif test $SAMPFREQ -le 44100; then
+		FFTLEN=2048
+		FREQWARP=0.76
+		MGCORDER=59
+		BAPORDER=4
+	elif test $SAMPFREQ -le 48000; then
+		FFTLEN=2048
+		FREQWARP=0.77
+		MGCORDER=59
+		BAPORDER=4
+        else
+		as_fn_error $? "As of now, we don't support curren sampling rate on WORLD[16000,22050,44100,48000]."
 	fi
 fi
 

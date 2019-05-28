@@ -9,7 +9,10 @@ HTS-demo project with blank data, expecially extended for Mandarin Chinese SPSS 
 ------extract 250 utterances with WORLD: 3 minutes  
 ------extract 250 utterances with WORLD and REAPER: 8 minutes  
 ---you can use multiprocess with Python in ../project/data/scripts/extract_features_world.py  
----[python scripts/extract_features_world.py /home/shaopf/study/HTS_Demo/HTS-Project00/data 48000 /home/shaopf/study/merlin_Mandarin/tools/bin/WORLD /home/shaopf/study/merlin_Mandarin/tools/bin/REAPER /usr/local/SPTK]  
+---Run extract_features_world.py  
+```Python  
+python scripts/extract_features_world.py /home/shaopf/study/HTS_Demo/HTS-Project00/data 48000 /home/shaopf/study/merlin_Mandarin/tools/bin/WORLD /home/shaopf/study/merlin_Mandarin/tools/bin/REAPER /usr/local/SPTK  
+```   
 ---then,   
 ---cd data  
 ---make cmp  

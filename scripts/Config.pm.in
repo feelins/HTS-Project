@@ -52,9 +52,10 @@ $spkr        = '@SPEAKER@';
 $qname       = '@QNAME@';
 $ver         = '@VER@';
 $usestraight = '@USESTRAIGHT@';
+$useworld    = '@USEWORLD@';
 
 @SET        = ('cmp', 'dur');
-if ( !$usestraight ) {
+if ( !$usestraight && $useworld ) {
    @cmp     = ('mgc', 'lf0');
 }
 else {
@@ -284,6 +285,9 @@ $INTERPOLATE = '@INTERPOLATE@';
 $MATLAB   = '@MATLAB@';
 $STRAIGHT = '@STRAIGHT@';
 
+# WORLD
+$WORLDSYN = '@WORLDSYN';
+
 
 # Switch ================================
 $MKENV = 1; # preparing environments 000
@@ -306,8 +310,8 @@ $MSPF1 = 1; # training modulation spectrum-based postfilter (1mix) 016
 $MKUN1 = 1; # making unseen models (1mix) 017
 $PGEN1 = 1; # generating speech parameter sequences (1mix) 018
 $WGEN1 = 1; # synthesizing waveforms (1mix) 019
-$CONVM = 1; # converting mmfs to the hts_engine file format 020
-$ENGIN = 1; # synthesizing waveforms using hts_engine 021
+$CONVM = 0; # converting mmfs to the hts_engine file format 020
+$ENGIN = 0; # synthesizing waveforms using hts_engine 021
 $MKDAT = 1; # making training data for deep neural network 022
 $TRDNN = 1; # training a deep neural network 023
 $MSPFD = 1; # training modulation spectrum-based postfilter (dnn) 024

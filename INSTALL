@@ -48,7 +48,7 @@
                  --with-hts-engine-search-path=/usr/local/hts_engine \
                  --with-world-path=/home/shaopf/study/merlin_Mandarin/tools/bin/WORLD \
                  --with-reaper-path=/home/shaopf/study/merlin_Mandarin/tools/bin/REAPER/reaper \
-                 USEWORLD=1 USEREAPER=1 SAMPFREQ=48000 LOWERF0=100 UPPERF0=450 QNAME=ma_CN.talk
+                 USEWORLD=1 USEHMMGV=0 USEREAPER=1 SAMPFREQ=48000 LOWERF0=100 UPPERF0=450 QNAME=ma_CN.talk
 
    If you use neural networks, configure script can be run as follows.
 
@@ -71,7 +71,6 @@
 
    % ./configure NSTATE=7 NITER=10 WFLOOR=5   (# of HMM states=7, # of EM iterations=10, mix weight floor=5)
 
-   % ./configure --with-fest-search-path=/home/shaopf/study/festival25/festival/examples --with-sptk-search-path=/usr/local/SPTK --with-hts-search-path=/usr/local/HTS-2.3/bin --with-hts-engine-search-path=/usr/local/hts_engine MGCORDER=39 FREQWARP=0.42 FFTLEN=512 SAMPFREQ=16000 FRAMELEN=400 fRAMESHIFT=80 LOWERF0=80 UPPERF0=450
 
    Please refer to the help message for details:
 
